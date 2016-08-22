@@ -46,7 +46,15 @@ void handleConnection(ClientSocket& csock) {
         return;
     }
 
+#ifdef VERBOSE
     cout << parsedReq->path << endl;
+    cout << "Host: " << parsedReq->host << endl;
+#endif
+#ifdef DEBUG
+    cout << parsedReq->path << endl;
+    cout << "Host: " << parsedReq->host << endl;
+#endif
+
     WebSocket wreq = WebSocket(parsedReq->host, 80);
     n = wreq.sendRequest(parsedReq);
     if (n < 0) {

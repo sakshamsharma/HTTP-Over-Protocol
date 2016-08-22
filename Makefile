@@ -5,6 +5,13 @@ INC=-I./include
 SRC=./src
 OBJ=bin
 
+# Available flags:
+# DEBUG: DEBUG outputs from my code
+# DEBUG_PROXY: DEBUG outputs from the request parsing
+#              library
+# VERBOSE: Prints some more info
+# DEBUG=-D DEBUG -D DEBUG_PROXY
+
 SRCFILES=$(addprefix $(OBJ)/, $(subst .c,.o, $(subst .cpp,.o, $(subst $(SRC)/,,$(wildcard $(SRC)/*)))))
 
 print-%  : ; @echo $* = $($*)

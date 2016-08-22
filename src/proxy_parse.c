@@ -25,11 +25,11 @@ size_t ParsedRequest_requestLineLen(struct ParsedRequest *pr);
  */
 void debug(const char * format, ...) {
      va_list args;
-     if (DEBUG) {
-      va_start(args, format);
-      vfprintf(stderr, format, args);
-      va_end(args);
-     }
+#ifdef DEBUG_PROXY
+     va_start(args, format);
+     vfprintf(stderr, format, args);
+     va_end(args);
+#endif
 }
 
 
