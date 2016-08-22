@@ -23,3 +23,4 @@
 
 #define BUFSIZE 8191
 #define LINPRINT printf("--%d--\n", __LINE__)
+#define uchar unsigned char

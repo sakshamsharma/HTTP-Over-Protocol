@@ -18,13 +18,16 @@ WebSocket::WebSocket(std::string &host, int portNumber) {
           server->h_length);
     servAddr.sin_port = htons(portNumber);
 
-    /* Connect to the server's socket */
+    // Connect to the server's socket
     if (connect(fd, (struct sockaddr *)&servAddr, sizeof(servAddr)) < 0)
         error("Cannot connect to remote server");
 }
 
 void WebSocket::sendRequest(struct ParsedHeader *ph) {
-    std::cout << "Random stuff\n";
+    n = 0;
+    n += sprintf(webbuffer+n, "GET / HTTP/1.0\r\n");
+    n += sprintf(webbuffer+n, "Connection: close\r\n\r\n");
+    send(fd, webbuffer, n, 0);
 }
 
 void WebSocket::closeSocket() {
