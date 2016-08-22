@@ -1,6 +1,7 @@
 #include "standard.h"
 #include "utils.h"
 #include "serversocket.h"
+#include "websocket.h"
 #include "proxy_parse.h"
 
 using namespace std;
@@ -20,11 +21,56 @@ void pipeHandler(int dummy) {
   info("Connection closed due to SIGPIPE");
 }
 
-void handleConnection(ClientSocket csock) {
-    cout << "Haha" << endl;
+void handleConnection(ClientSocket& csock) {
+    int n = 0;
     vector<char> buffer((BUFSIZE+5)*sizeof(char));
+    char timebuf[80];
+    fillTimeBuffer(timebuf);
 
-    csock.readIntoBuffer(buffer);
+    do {
+        n += csock.readIntoBuffer(buffer, n);
+        if (n > BUFSIZE) {
+            csock.closeSocket();
+            error("Request length exceeded BUFSIZE");
+        }
+    } while (!(buffer[n-1] == '\n' &&
+               buffer[n-2] == '\r' &&
+               buffer[n-3] == '\n' &&
+               buffer[n-4] == '\r'));
+
+    struct ParsedRequest *parsedReq = ParsedRequest_create();
+    n = ParsedRequest_parse(parsedReq, &buffer[0], BUFSIZE);
+
+    if (n < 0) {
+        csock.send400(buffer, timebuf);
+        return;
+    }
+
+    cout << parsedReq->path << endl;
+    WebSocket wreq = WebSocket(parsedReq->host, 80);
+    n = wreq.sendRequest(parsedReq);
+    if (n < 0) {
+        csock.send400(buffer, timebuf);
+        wreq.closeSocket();
+        return;
+    }
+
+    n = wreq.recvOnSocket(buffer);
+    if (n < 0) {
+        wreq.closeSocket();
+        return;
+    }
+
+#ifdef DEBUG
+    cout << "********\n";
+    cout << &buffer[0] << endl;
+    cout << "********\n";
+#endif
+
+    csock.writeBufferToSocket(buffer, n);
+
+    wreq.closeSocket();
+
 }
 
 int main(int argc, char * argv[]) {

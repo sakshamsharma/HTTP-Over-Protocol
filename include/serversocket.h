@@ -13,6 +13,6 @@ public:
 
     ServerSocket();
     void listenOnPort(int portNumber);
-    void connectToClient(void (*f)(ClientSocket));
+    void connectToClient(void (*f)(ClientSocket&));
     void closeSocket();
 };

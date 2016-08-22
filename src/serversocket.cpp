@@ -29,7 +29,7 @@ void ServerSocket::listenOnPort(int portNumber) {
 }
 
 // Accept connections and return a ClientSocket object
-void ServerSocket::connectToClient(void (*connectionCallback)(ClientSocket)) {
+void ServerSocket::connectToClient(void (*connectionCallback)(ClientSocket&)) {
 
     int c = accept(mainSocketFd, (struct sockaddr *) &client, &clientLen);
     if (c < 0) error("Could not open connection");

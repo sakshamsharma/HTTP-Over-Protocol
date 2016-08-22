@@ -1,4 +1,5 @@
 #include "standard.h"
+#include "proxy_parse.h"
 
 class WebSocket {
 public:
@@ -8,7 +9,8 @@ public:
 
     char webbuffer[(BUFSIZE+5) * sizeof(uchar)];
 
-    WebSocket(std::string &host, int portNumber);
-    void sendRequest(struct ParsedHeader *ph);
+    WebSocket(char *host, int portNumber);
+    int recvOnSocket(std::vector<char> &buffer);
+    int sendRequest(struct ParsedRequest *pr);
     void closeSocket();
 };

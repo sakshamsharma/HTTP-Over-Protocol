@@ -21,6 +21,6 @@
 #include <iostream>
 #include <string>
 
-#define BUFSIZE 8191
+#define BUFSIZE 65535
 #define LINPRINT printf("--%d--\n", __LINE__)
 #define uchar unsigned char

@@ -12,8 +12,8 @@ void ClientSocket::closeSocket() {
 }
 
 // Reads text from socket into buffer
-int ClientSocket::readIntoBuffer(std::vector<char> &buffer) {
-  int n = recv(fd, &buffer[0], BUFSIZE, 0);
+int ClientSocket::readIntoBuffer(std::vector<char> &buffer, int lenUsed) {
+  int n = recv(fd, &buffer[lenUsed], BUFSIZE-lenUsed, 0);
   if (n < 0) error("Error while read message from client socket");
   return n;
 }
@@ -31,7 +31,7 @@ void ClientSocket::send400(std::vector<char> &buf, char *timebuf) {
   int n = 0;
   n += sprintf(&buf[n], "HTTP/1.0 400 Bad Request\r\n");
   n += sprintf(&buf[n], "Date: %s\r\n", timebuf);
-  n += sprintf(&buf[n], "Server: Saksham's CS425A HTTP server\r\n");
+  n += sprintf(&buf[n], "Server: Saksham's CS425A HTTP proxy\r\n");
   n += sprintf(&buf[n], "Connection: close\r\n");
   n += sprintf(&buf[n], "Content-type: text/html\r\n\r\n");
   n += sprintf(&buf[n], "<HEAD><TITLE>400 Bad Request</TITLE></HEAD>\r\n");
@@ -48,7 +48,7 @@ void ClientSocket::send404(std::vector<char> &buf, char *timebuf,
   int n = 0;
   n += sprintf(&buf[n], "HTTP/1.0 404 Not Found\r\n");
   n += sprintf(&buf[n], "Date: %s\r\n", timebuf);
-  n += sprintf(&buf[n], "Server: Saksham's CS425A HTTP server\r\n");      
+  n += sprintf(&buf[n], "Server: Saksham's CS425A HTTP server\r\n");
   n += sprintf(&buf[n], "Connection: close\r\n");
   n += sprintf(&buf[n], "Content-type: text/html\r\n\r\n");
   n += sprintf(&buf[n], "<HEAD><TITLE>404 Not Found</TITLE></HEAD>\r\n");
