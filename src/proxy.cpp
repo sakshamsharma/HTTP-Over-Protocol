@@ -22,7 +22,7 @@ void pipeHandler(int dummy) {
 }
 
 void handleConnection(ClientSocket& csock) {
-    int n = 0;
+    int n = 0, contentLen = 0, k;
     vector<char> buffer((BUFSIZE+5)*sizeof(char));
     char timebuf[80];
     fillTimeBuffer(timebuf);
@@ -55,7 +55,7 @@ void handleConnection(ClientSocket& csock) {
     cout << "Host: " << parsedReq->host << endl;
 #endif
 
-    WebSocket wreq = WebSocket(parsedReq->host, 80);
+    WebSocket wreq = WebSocket(parsedReq->host, atoi(parsedReq->port));
     n = wreq.sendRequest(parsedReq);
     if (n < 0) {
         csock.send400(buffer, timebuf);
@@ -64,18 +64,68 @@ void handleConnection(ClientSocket& csock) {
     }
 
     n = wreq.recvOnSocket(buffer);
-    if (n < 0) {
+
+    // If client closes connection, 0 is sent
+    if (n <= 0) {
         wreq.closeSocket();
         return;
     }
 
+    // Flush this much content to client first
+    csock.writeBufferToSocket(buffer, n);
+
+    // Now try to find the content length in this content
+    char *m = strstr(&buffer[0], "\r\nContent-Length:");
+    if (m == NULL) {
+        m = strstr(&buffer[0], "\r\nContent-length");
+    }
+    if (m == NULL) {
+        m = strstr(&buffer[0], "\r\ncontent-length");
+    }
+    if (m == NULL) {
+        contentLen = n;
+    }
+    k = (int)(m - &buffer[0]);
+
+    k += 18; // Length of "\r\nContent-Length:"
+
+    // Parse the content length
+    if (buffer[k] == ' ' || buffer[k] == ':') k++;
+    while (buffer[k] <= '9' && buffer[k] >= '0') {
+        contentLen = contentLen*10 + (int)buffer[k] - '0';
+        k++;
+    }
+
 #ifdef DEBUG
-    cout << "********\n";
-    cout << &buffer[0] << endl;
-    cout << "********\n";
+    cout << "Content-Len: " << contentLen << endl;
 #endif
 
-    csock.writeBufferToSocket(buffer, n);
+    // Find the end of headers
+    m = strstr(&buffer[0], "\r\n\r\n");
+    if (m == NULL) {
+        csock.send400(buffer, timebuf);
+        wreq.closeSocket();
+        return;
+    }
+
+    // Start of the message part
+    k = (int)(m - &buffer[0] + 4);
+
+    n = max(0, n - k);
+
+    while (n < contentLen) {
+        k = wreq.recvOnSocket(buffer);
+        n += k;
+        if (n < 0) {
+            wreq.closeSocket();
+            return;
+        }
+        csock.writeBufferToSocket(buffer, k);
+        if (n == 0) {           // In case client closes connection
+            wreq.closeSocket();
+            return;
+        }
+    }
 
     wreq.closeSocket();
 

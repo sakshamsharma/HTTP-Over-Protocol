@@ -10,7 +10,7 @@ OBJ=bin
 # DEBUG_PROXY: DEBUG outputs from the request parsing
 #              library
 # VERBOSE: Prints some more info
-# DEBUG=-D DEBUG -D DEBUG_PROXY
+DEBUG=-D DEBUG -D DEBUG_PROXY
 
 SRCFILES=$(addprefix $(OBJ)/, $(subst .c,.o, $(subst .cpp,.o, $(subst $(SRC)/,,$(wildcard $(SRC)/*)))))
 
