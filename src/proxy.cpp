@@ -2,11 +2,7 @@
 #include "utils.h"
 #include "serversocket.h"
 #include "logger.cpp"
-
-#ifndef PROXY
-#define PROXY
 #include "proxysocket.h"
-#endif
 
 using namespace std;
 

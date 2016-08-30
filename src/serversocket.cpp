@@ -1,11 +1,7 @@
 #include "standard.h"
 #include "utils.h"
 #include "serversocket.h"
-
-#ifndef PROXY
-#define PROXY
 #include "proxysocket.h"
-#endif
 
 ServerSocket::ServerSocket() {
     on = 1;

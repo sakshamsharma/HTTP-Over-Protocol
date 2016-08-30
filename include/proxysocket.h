@@ -1,3 +1,6 @@
+#ifndef PROXY
+#define PROXY
+
 #include "standard.h"
 #include "proxy_parse.h"
 
@@ -23,3 +26,5 @@ public:
     int sendFromSocket(std::vector<char> &buffer, int len, int from);
     void closeSocket();
 };
+
+#endif

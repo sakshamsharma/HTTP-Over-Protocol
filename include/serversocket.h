@@ -1,7 +1,4 @@
-#ifndef PROXY
-#define PROXY
 #include "proxysocket.h"
-#endif
 
 class ServerSocket {
 public:
