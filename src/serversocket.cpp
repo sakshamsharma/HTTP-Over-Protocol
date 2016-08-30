@@ -2,9 +2,9 @@
 #include "utils.h"
 #include "serversocket.h"
 
-#ifndef CLIENTS
-#define CLIENTS
-#include "clientsocket.h"
+#ifndef PROXY
+#define PROXY
+#include "proxysocket.h"
 #endif
 
 ServerSocket::ServerSocket() {
@@ -28,16 +28,14 @@ void ServerSocket::listenOnPort(int portNumber) {
     listen(mainSocketFd, 30000);
 }
 
-// Accept connections and return a ClientSocket object
-void ServerSocket::connectToClient(void (*connectionCallback)(ClientSocket&)) {
+void ServerSocket::connectToSocket(void (*connectionCallback)(ProxySocket&)) {
 
     int c = accept(mainSocketFd, (struct sockaddr *) &client, &clientLen);
     if (c < 0) return;
     setNonBlocking(c);
 
-    char ipaddr[40];
-    inet_ntop(AF_INET, &(client.sin_addr), ipaddr, 40);
-    ClientSocket csock = ClientSocket(c, ipaddr);
+    ProxySocket sock = ProxySocket();
+    sock.ListeningMode(c, PLAIN);
 
     info("Connected to client");
 
@@ -48,16 +46,15 @@ void ServerSocket::connectToClient(void (*connectionCallback)(ClientSocket&)) {
         // Forked process
         this->closeSocket();
 
-        connectionCallback(csock);
+        connectionCallback(sock);
         info("Closing connection");
-        csock.closeSocket();
+        sock.closeSocket();
         exit(0);
 
     } else {
         // Main process
-        csock.closeSocket();
+        sock.closeSocket();
     }
-
 }
 
 void ServerSocket::closeSocket() {

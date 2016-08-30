@@ -1,6 +1,6 @@
-#ifndef CLIENTS
-#define CLIENTS
-#include "clientsocket.h"
+#ifndef PROXY
+#define PROXY
+#include "proxysocket.h"
 #endif
 
 class ServerSocket {
@@ -13,6 +13,7 @@ public:
 
     ServerSocket();
     void listenOnPort(int portNumber);
-    void connectToClient(void (*f)(ClientSocket&));
+    //void connectToClient(void (*f)(ClientSocket&));
+    void connectToSocket(void (*f)(ProxySocket&));
     void closeSocket();
 };
