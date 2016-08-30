@@ -30,8 +30,7 @@ void ServerSocket::connectToSocket(void (*connectionCallback)(ProxySocket&)) {
     if (c < 0) return;
     setNonBlocking(c);
 
-    ProxySocket sock = ProxySocket();
-    sock.ListeningMode(c, PLAIN);
+    ProxySocket sock = ProxySocket(c, PLAIN);
 
     info("Connected to client");
 

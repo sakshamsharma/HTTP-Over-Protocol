@@ -5,16 +5,14 @@
 
 using namespace std;
 
-ProxySocket::ProxySocket() {}
-
-void ProxySocket::ListeningMode(int _fd, Protocol _inProto) {
+ProxySocket::ProxySocket(int _fd, Protocol _inProto) {
     fd = _fd;
     protocol = _inProto;
 
     setNonBlocking(fd);
 }
 
-void ProxySocket::MakeOutwardConnection(char *host, int port, Protocol _outProto) {
+ProxySocket::ProxySocket(char *host, int port, Protocol _outProto) {
     protocol = _outProto;
 
     // Open a socket file descriptor

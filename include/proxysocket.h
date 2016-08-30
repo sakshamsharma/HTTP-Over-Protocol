@@ -18,9 +18,8 @@ public:
     int a, b, retval;
     bool connectionBroken, gotHttpHeaders;
 
-    ProxySocket();
-    void ListeningMode(int, Protocol);
-    void MakeOutwardConnection(char *, int, Protocol);
+    ProxySocket(int, Protocol);
+    ProxySocket(char *, int, Protocol);
 
     int recvFromSocket(std::vector<char> &buffer, int);
     int sendFromSocket(std::vector<char> &buffer, int len, int from);
