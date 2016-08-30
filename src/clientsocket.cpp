@@ -30,8 +30,8 @@ int ClientSocket::recvFromSocket(std::vector<char> &buffer, int n) {
     return recv(fd, &buffer[n], BUFSIZE - n - 2, 0);
 }
 
-int ClientSocket::sendOnSocket(std::vector<char> &buffer, int n) {
-    return send(fd, &buffer[0], n, 0);
+int ClientSocket::sendOnSocket(std::vector<char> &buffer, int n, int from) {
+    return send(fd, &buffer[from], n, 0);
 }
 
 // Send a 400 Bad Request message
