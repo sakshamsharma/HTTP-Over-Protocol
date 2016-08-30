@@ -9,6 +9,8 @@
 #include <arpa/inet.h>
 #include <signal.h>
 #include <dirent.h>
+#include <sys/select.h>
+#include <sys/fcntl.h>
 #include <ctime>
 
 #include <sys/types.h>
@@ -19,6 +21,7 @@
 #include <vector>
 #include <map>
 #include <iostream>
+#include <sstream>
 #include <string>
 
 #define BUFSIZE 65535

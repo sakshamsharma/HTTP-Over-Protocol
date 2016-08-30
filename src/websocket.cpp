@@ -22,6 +22,8 @@ WebSocket::WebSocket(char *host, int portNumber) {
     // Connect to the server's socket
     if (connect(fd, (struct sockaddr *)&servAddr, sizeof(servAddr)) < 0)
         error("Cannot connect to remote server");
+
+    setNonBlocking(fd);
 }
 
 int WebSocket::sendRequest(struct ParsedRequest *pr) {
@@ -57,10 +59,27 @@ int WebSocket::sendRequest(struct ParsedRequest *pr) {
     return 0;
 }
 
-int WebSocket::recvOnSocket(std::vector<char> &buffer) {
-    return recv(fd, &buffer[0], BUFSIZE, 0);
+int WebSocket::recvOnSocket(std::vector<char> &buffer, int n) {
+    return recv(fd, &buffer[n], BUFSIZE - n - 2, 0);
 }
 
 void WebSocket::closeSocket() {
+    if (writeSocket != NULL) {
+        fclose(writeSocket);
+    }
+    if (readSocket != NULL) {
+        fclose(readSocket);
+    }
     close(fd);
+}
+
+int WebSocket::sendOnSocket(std::vector<char> &buffer, int n) {
+    return send(fd, &buffer[0], n, 0);
+}
+
+int WebSocket::writeOnSocket(std::vector<char> &buffer, int n) {
+    if (writeSocket == NULL) {
+        writeSocket = fdopen(dup(fd), "w");
+    }
+    return fwrite(&buffer[0], 1, n, writeSocket);
 }

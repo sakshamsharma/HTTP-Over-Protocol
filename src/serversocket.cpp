@@ -32,7 +32,8 @@ void ServerSocket::listenOnPort(int portNumber) {
 void ServerSocket::connectToClient(void (*connectionCallback)(ClientSocket&)) {
 
     int c = accept(mainSocketFd, (struct sockaddr *) &client, &clientLen);
-    if (c < 0) error("Could not open connection");
+    if (c < 0) return;
+    setNonBlocking(c);
 
     char ipaddr[40];
     inet_ntop(AF_INET, &(client.sin_addr), ipaddr, 40);

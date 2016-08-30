@@ -26,6 +26,14 @@ void ClientSocket::writeBufferToSocket(std::vector<char> &buffer, int n) {
   fclose(writeSocket);
 }
 
+int ClientSocket::recvFromSocket(std::vector<char> &buffer, int n) {
+    return recv(fd, &buffer[n], BUFSIZE - n - 2, 0);
+}
+
+int ClientSocket::sendOnSocket(std::vector<char> &buffer, int n) {
+    return send(fd, &buffer[0], n, 0);
+}
+
 // Send a 400 Bad Request message
 void ClientSocket::send400(std::vector<char> &buf, char *timebuf) {
   int n = 0;

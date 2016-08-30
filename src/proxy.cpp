@@ -3,10 +3,13 @@
 #include "serversocket.h"
 #include "websocket.h"
 #include "proxy_parse.h"
+#include "logger.cpp"
 
 using namespace std;
 
 ServerSocket mainSocket;
+char *remoteUrl;
+int remotePort;
 
 // For closing the sockets safely when Ctrl+C SIGINT is received
 void intHandler(int dummy) {
@@ -22,113 +25,65 @@ void pipeHandler(int dummy) {
 }
 
 void handleConnection(ClientSocket& csock) {
-    int n = 0, contentLen = 0, k;
+    int contentLen = 0;
+    int a = 0, b = 0;
+    int retval;
     vector<char> buffer((BUFSIZE+5)*sizeof(char));
-    char timebuf[80];
-    fillTimeBuffer(timebuf);
+    bool areTheyStillThere = true;
+
+    WebSocket wsock = WebSocket(remoteUrl, remotePort);
 
     do {
-        n += csock.readIntoBuffer(buffer, n);
-        if (n > BUFSIZE) {
-            csock.closeSocket();
-            error("Request length exceeded BUFSIZE");
+        a = 0;
+        b = 0;
+        do {
+            retval = wsock.recvOnSocket(buffer, a);
+            if (retval < 0) {
+                b++;
+            } else {
+                logger << &buffer[0] << "\nGot " << retval << "\n";
+                if (retval == 0) {
+                    areTheyStillThere = false;
+                    break;
+                }
+                b = 0;
+                a += retval;
+            }
+        } while (b < 50000 && a < 500);
+
+        if (a > 0) {
+            logger << "Writing " << a << " bytes back";
+            csock.sendOnSocket(buffer, a);
+        } else {
+            logger << "Got nothing from ssh server " << a;
         }
-    } while (!(buffer[n-1] == '\n' &&
-               buffer[n-2] == '\r' &&
-               buffer[n-3] == '\n' &&
-               buffer[n-4] == '\r'));
 
-    struct ParsedRequest *parsedReq = ParsedRequest_create();
-    n = ParsedRequest_parse(parsedReq, &buffer[0], BUFSIZE);
-
-    if (n < 0) {
-        csock.send400(buffer, timebuf);
-        return;
-    }
-
-#ifdef VERBOSE
-    cout << parsedReq->path << endl;
-    cout << "Host: " << parsedReq->host << endl;
-#endif
-#ifdef DEBUG
-    cout << parsedReq->path << endl;
-    cout << "Host: " << parsedReq->host << endl;
-#endif
-
-    WebSocket wreq = WebSocket(parsedReq->host, atoi(parsedReq->port));
-    n = wreq.sendRequest(parsedReq);
-    if (n < 0) {
-        csock.send400(buffer, timebuf);
-        wreq.closeSocket();
-        return;
-    }
-
-    n = wreq.recvOnSocket(buffer);
-
-    // If client closes connection, 0 is sent
-    if (n <= 0) {
-        wreq.closeSocket();
-        return;
-    }
-
-    // Flush this much content to client first
-    csock.writeBufferToSocket(buffer, n);
-
-    // Now try to find the content length in this content
-    char *m = strstr(&buffer[0], "\r\nContent-Length:");
-    if (m == NULL) {
-        m = strstr(&buffer[0], "\r\nContent-length");
-    }
-    if (m == NULL) {
-        m = strstr(&buffer[0], "\r\ncontent-length");
-    }
-    if (m == NULL) {
-        contentLen = n;
-    }
-    k = (int)(m - &buffer[0]);
-
-    k += 18; // Length of "\r\nContent-Length:"
-
-    // Parse the content length
-    if (buffer[k] == ' ' || buffer[k] == ':') k++;
-    while (buffer[k] <= '9' && buffer[k] >= '0') {
-        contentLen = contentLen*10 + (int)buffer[k] - '0';
-        k++;
-    }
-
-#ifdef DEBUG
-    cout << "Content-Len: " << contentLen << endl;
-#endif
-
-    // Find the end of headers
-    m = strstr(&buffer[0], "\r\n\r\n");
-    if (m == NULL) {
-        csock.send400(buffer, timebuf);
-        wreq.closeSocket();
-        return;
-    }
-
-    // Start of the message part
-    k = (int)(m - &buffer[0] + 4);
-
-    n = max(0, n - k);
-
-    while (n < contentLen) {
-        k = wreq.recvOnSocket(buffer);
-        n += k;
-        if (n < 0) {
-            wreq.closeSocket();
-            return;
+        a = 0;
+        b = 0;
+        do {
+            retval = csock.recvFromSocket(buffer, a);
+            if (retval < 0) {
+                b++;
+            } else {
+                logger << &buffer[0] << "\nFrom client " << retval;
+                if (retval == 0) {
+                    areTheyStillThere = false;
+                    break;
+                }
+                b = 0;
+                a += retval;
+            }
+        } while (b < 50000 && a < 500);
+        if (a > 0) {
+            logger << "Writing " << a << " bytes to server";
+            wsock.sendOnSocket(buffer, a);
+        } else {
+            logger << "Nothing to write back to server " << a;
         }
-        csock.writeBufferToSocket(buffer, k);
-        if (n == 0) {           // In case client closes connection
-            wreq.closeSocket();
-            return;
+        if (!areTheyStillThere) {
+            break;
         }
-    }
-
-    wreq.closeSocket();
-
+    } while (1);
 }
 
 int main(int argc, char * argv[]) {
@@ -139,9 +94,11 @@ int main(int argc, char * argv[]) {
     signal(SIGCHLD, SIG_IGN);
 
     // CLI argument parsing
-    if (argc != 2)
-        error("Port number not provided\nUsage format: ./http-server <port>");
+    if (argc != 4)
+        error("Usage format: ./http-server <local port> <remote url> <remotePort>");
     portNumber = atoi(argv[1]);
+    remoteUrl = argv[2];
+    remotePort = atoi(argv[3]);
 
     // Class ServerSocket handles the connection logic
     mainSocket.listenOnPort(portNumber);
