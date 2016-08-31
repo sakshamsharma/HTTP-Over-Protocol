@@ -1,15 +1,15 @@
 #include "standard.h"
 #include "utils.h"
 #include "proxysocket.h"
-#include "logger.cpp"
+#include "logger.h"
 
 using namespace std;
 
 ProxySocket::ProxySocket(int _fd, Protocol _inProto) {
     fd = _fd;
     protocol = _inProto;
-    logger << "Accepted connection";
-    logger << "This connection is in " << (protocol==PLAIN?"PLAIN":"HTTP");
+    logger(DEBUG) << "Accepted connection";
+    logger(DEBUG) << "This connection is in " << (protocol==PLAIN?"PLAIN":"HTTP");
     sprintf(ss, "HTTP/1.1 200 OK\r\nContent-Length");
 
     setNonBlocking(fd);
@@ -17,18 +17,24 @@ ProxySocket::ProxySocket(int _fd, Protocol _inProto) {
 
 ProxySocket::ProxySocket(char *host, int port, Protocol _outProto) {
     protocol = _outProto;
-    logger << "Making outgoing connection to " << host << ":" << port;
-    logger << "This connection is in " << (protocol==PLAIN?"PLAIN":"HTTP");
+    logger(DEBUG) << "Making outgoing connection to " << host << ":" << port;
+    logger(DEBUG) << "This connection is in " << (protocol==PLAIN?"PLAIN":"HTTP");
     sprintf(ss, "GET %s / HTTP/1.0\r\nHost: %s:%d\r\nContent-Length",
             host, host, port);
 
     // Open a socket file descriptor
     fd = socket(AF_INET, SOCK_STREAM, 0);
-    if (fd < 0) error("Could not open outward socket");
+    if (fd < 0) {
+        logger(ERROR) << "Could not open outward socket";
+        exit(0);
+    }
 
     // Standard syntax
     server = gethostbyname(host);
-    if (!server) error("Cannot reach host");
+    if (!server) {
+        logger(ERROR) << "Cannot reach host";
+        exit(0);
+    }
 
     bzero((char *)&servAddr, sizeof(servAddr));
     servAddr.sin_family = AF_INET;
@@ -39,8 +45,9 @@ ProxySocket::ProxySocket(char *host, int port, Protocol _outProto) {
 
     // Connect to the server's socket
     if (connect(fd, (struct sockaddr *)&servAddr, sizeof(servAddr)) < 0) {
-        logger << "Was connecting to " << host << ":" << port;
-        error("Cannot connect to remote server");
+        logger(ERROR) << "Was connecting to " << host << ":" << port << "\n"
+                      << "Cannot connect to remote server";
+        exit(0);
     }
 
     setNonBlocking(fd);
@@ -54,7 +61,7 @@ int ProxySocket::recvFromSocket(vector<char> &buffer, int from,
     connectionBroken = false;
     gotHttpHeaders = -1;
     if (protocol == PLAIN) {
-        logger << "Recv PLAIN";
+        logger(DEBUG) << "Recv PLAIN";
         do {
             retval = recv(fd, &buffer[a+from], BUFSIZE-from-2, 0);
             if (retval < 0) {
@@ -70,10 +77,10 @@ int ProxySocket::recvFromSocket(vector<char> &buffer, int from,
         } while (b < 50000 && a < 500);
         respFrom = 0;
 
-        logger << "Received " << a << " bytes as plain.";
+        logger(DEBUG) << "Received " << a << " bytes as plain.";
 
     } else if (protocol == HTTP) {
-        logger << "Recv HTTP";
+        logger(DEBUG) << "Recv HTTP";
         k = 0;
         do {
             retval = recv(fd, &buffer[a+from], BUFSIZE-from-2-a, 0);
@@ -104,8 +111,8 @@ int ProxySocket::recvFromSocket(vector<char> &buffer, int from,
             return 0;
         }
 
-        logger << "Received " << a << " bytes as HTTP headers";
-        logger << &buffer[from];
+        logger(DEBUG) << "Received " << a << " bytes as HTTP headers";
+        logger(DEBUG) << &buffer[from];
 
         for (b=from; b<a+from; b++) {
             if (strncmp(&buffer[b], "Content-Length: ", 16) == 0) {
@@ -114,7 +121,7 @@ int ProxySocket::recvFromSocket(vector<char> &buffer, int from,
         }
 
         if (b == a+from) {
-            logger << "Didn't find content-length in headers";
+            logger(DEBUG) << "Didn't find content-length in headers";
             return 0;
         }
 
@@ -129,7 +136,7 @@ int ProxySocket::recvFromSocket(vector<char> &buffer, int from,
         from = a+from;
         a = a-gotHttpHeaders;
         respFrom = gotHttpHeaders;
-        logger << "headers end at " << gotHttpHeaders;
+        logger(DEBUG) << "headers end at " << gotHttpHeaders;
         do {
             retval = recv(fd, &buffer[a+from], BUFSIZE-from-2-a, 0);
             if (retval == 0) {
@@ -153,19 +160,19 @@ int ProxySocket::sendFromSocket(vector<char> &buffer, int from, int len) {
     a = 0;
     b = 0;
     if (protocol == PLAIN) {
-        logger << "Write PLAIN";
+        logger(DEBUG) << "Write PLAIN";
         a = send(fd, &buffer[from], len, 0);
     } else if (protocol == HTTP) {
-        logger << "Write HTTP";
+        logger(DEBUG) << "Write HTTP";
         b = sprintf(headers, "%s: %d\r\n\r\n", ss, len);
-        logger << "Wrote " << headers;
+        logger(DEBUG) << "Wrote " << headers;
         a = send(fd, headers, b, 0);
         if (a < 1) {
             return -1;
         }
         a = send(fd, &buffer[from], len, 0);
         buffer[from+len] = 0;
-        logger << "Wrote now " << &buffer[from];
+        logger(DEBUG) << "Wrote now " << &buffer[from];
     }
     return a;
 }
