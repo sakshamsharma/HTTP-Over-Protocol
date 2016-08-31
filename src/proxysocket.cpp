@@ -181,6 +181,39 @@ int ProxySocket::sendFromSocket(vector<char> &buffer, int from, int len) {
     return a;
 }
 
+void ProxySocket::sendHelloMessage() {
+    logger(VERB1) << "Sending hello handshake";
+    a = 0;
+    b = 0;
+    do {
+        b = send(fd, "GET / HTTP/1.1\r\n\r\n", 18, 0);
+        if (b == 0) {
+            logger(ERROR) << "Connection closed at handshake";
+            exit(0);
+        } else if (b > 0) {
+            a += b;
+        }
+    } while (a < 18);
+    logger(VERB1) << "Sent handshake";
+}
+
+void ProxySocket::receiveHelloMessage() {
+    logger(VERB1) << "Receiving hello handshake";
+    a = 0;
+    b = 0;
+    char tmp[20];
+    do {
+        b = recv(fd, tmp, 18, 0);
+        if (b == 0) {
+            logger(ERROR) << "Connection closed at handshake";
+            exit(0);
+        } else if (b > 0) {
+            a += b;
+        }
+    } while (a < 18);
+    logger(VERB1) << "Received handshake";
+}
+
 void ProxySocket::closeSocket() {
     close(fd);
 }

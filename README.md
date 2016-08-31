@@ -61,6 +61,5 @@ ssh <target-machine-username>@localhost -p <client-hop-port>
 * HTTP Responses may come before HTTP Requests. Let me know if you know of some proxy which blocks such responses.
 
 # Planned features
-* Better and more adaptive buffering
-* More logging levels
+* Better and adaptive buffering
 * Better CLI flags interface

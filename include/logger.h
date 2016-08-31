@@ -4,8 +4,9 @@
 #include <iostream>
 #include <sstream>
 
-enum LogLevel { DEBUG, INFO, WARN, ERROR};
-static const char *logStrings[] = { "DEBUG", "INFO ", "WARN ", "ERROR" };
+enum LogLevel { DEBUG, VERB1, INFO, WARN, ERROR};
+static const char *logStrings[] =
+    { "DEBUG", "VERB1", "INFO ", "WARN ", "ERROR" };
 
 const LogLevel logLevel = INFO;
 

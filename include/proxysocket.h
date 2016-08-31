@@ -24,6 +24,10 @@ public:
 
     int recvFromSocket(std::vector<char> &buffer, int, int &);
     int sendFromSocket(std::vector<char> &buffer, int len, int from);
+
+    void sendHelloMessage();
+    void receiveHelloMessage();
+
     void closeSocket();
 };
 
