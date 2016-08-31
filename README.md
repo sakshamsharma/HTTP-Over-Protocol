@@ -31,6 +31,10 @@ Client -> Client SSH process -> Client HOP process -> Proxy -> Target HOP proces
 
 **HOP** simply wraps all the data in HTTP packets, and buffers them accordingly.
 
+Another even more complicated scenario would be if you have an external utility server, and need to access another server's
+resources from behind a proxy. In this case, *hop* will still run on your external server, but instead of using `localhost`
+in the second command (Usage section), use the hostname of the target machine which has the host.
+
 # Usage
 On the client machine:
 ```
@@ -39,8 +43,9 @@ On the client machine:
 
 On the target machine:
 ```
-./hop <server-hop-port> localhost <target-port>
+./hop <server-hop-port> localhost <target-port> SERVER
 ```
+(Note the keyword SERVER at the end)
 
 In case of SSH, the target-port would be 22.
 Now once these 2 are running, to SSH you would run the following:
@@ -48,6 +53,8 @@ Now once these 2 are running, to SSH you would run the following:
 ```
 ssh <target-machine-username>@localhost -p <client-hop-port>
 ```
+
+*Note*: The keyword server tells *hop* which side of the connection has to be over HTTP.
 
 # Bugs
 * Currently uses a 100ms sleep after every send/receive cycle to allow for synchonizations.
