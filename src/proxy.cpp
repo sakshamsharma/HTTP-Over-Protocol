@@ -26,6 +26,7 @@ void pipeHandler(int dummy) {
 
 void exchangeData(ProxySocket& sock) {
     vector<char> buffer((BUFSIZE+5)*sizeof(char));
+    vector<char> duffer((BUFSIZE+5)*sizeof(char));
 
     ProxySocket outsock = ProxySocket(remoteUrl, remotePort,
                                       mode==CLIENT?HTTP:PLAIN);
@@ -44,22 +45,26 @@ void exchangeData(ProxySocket& sock) {
         if (a == 0) {
             logger << "Got nothing from remote";
         } else {
+            // TODO If sock is HTTP, don't send till there's a request read
             sock.sendFromSocket(buffer, 0, a);
             logger << "Sent " << a << " bytes from remote to local";
         }
+        buffer[0] = 0;
 
-        a = sock.recvFromSocket(buffer, 0);
+        a = sock.recvFromSocket(duffer, 0);
         if (a == -1) {
             areTheyStillThere = false;
             break;
         }
         if (a == 0) {
             logger << "Got nothing from client";
+            // TODO Send empty HTTP requests if outsock is HTTP
         } else {
-            outsock.sendFromSocket(buffer, 0, a);
+            outsock.sendFromSocket(duffer, 0, a);
             logger << "Sent " << a << " bytes from local to remote";
         }
-
+        duffer[0] = 0;
+        sleep(2);
     } while (areTheyStillThere);
 }
 

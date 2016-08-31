@@ -8,6 +8,8 @@ using namespace std;
 ProxySocket::ProxySocket(int _fd, Protocol _inProto) {
     fd = _fd;
     protocol = _inProto;
+    logger << "Accepted connection";
+    logger << "This connection is in " << (protocol==PLAIN?"PLAIN":"HTTP");
     sprintf(ss, "HTTP/1.1 200 OK\r\nContent-Length");
 
     setNonBlocking(fd);
@@ -15,6 +17,8 @@ ProxySocket::ProxySocket(int _fd, Protocol _inProto) {
 
 ProxySocket::ProxySocket(char *host, int port, Protocol _outProto) {
     protocol = _outProto;
+    logger << "Making outgoing connection to " << host << ":" << port;
+    logger << "This connection is in " << (protocol==PLAIN?"PLAIN":"HTTP");
     sprintf(ss, "GET %s / HTTP/1.0\r\nHost: %s:%d\r\nContent-Length",
             host, host, port);
 
@@ -69,16 +73,15 @@ int ProxySocket::recvFromSocket(vector<char> &buffer, int from) {
 
     } else if (protocol == HTTP) {
         logger << "Recv HTTP";
+        k = 0;
         do {
-            logger << "Loop";
             retval = recv(fd, &buffer[a+from], BUFSIZE-from-2-a, 0);
-            logger << "Gives " << retval << " after " << a;
-            logger << &buffer[from];
             if (retval == 0) {
                 connectionBroken = true;
                 break;
             }
             if (retval > 0) {
+                k = 0;
                 a += retval;
                 for (b=from; b<a+from-3; b++) {
                     if (buffer[b] == '\r' && buffer[b+1] == '\n' &&
@@ -89,8 +92,14 @@ int ProxySocket::recvFromSocket(vector<char> &buffer, int from) {
                     }
                 }
             }
-            sleep(1);
-        } while (gotHttpHeaders == -1);
+            if (retval == -1) {
+                k++;
+            }
+        } while (gotHttpHeaders == -1 && k < 50000);
+
+        if (a == 0) {
+            return 0;
+        }
 
         logger << "Received " << a << " bytes as HTTP headers";
         logger << &buffer[from];

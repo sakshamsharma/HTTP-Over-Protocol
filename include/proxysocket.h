@@ -17,7 +17,7 @@ public:
 
     Protocol protocol;
 
-    int a, b, retval, gotHttpHeaders;
+    int a, b, retval, gotHttpHeaders, k;
     bool connectionBroken;
 
     ProxySocket(int, Protocol);
