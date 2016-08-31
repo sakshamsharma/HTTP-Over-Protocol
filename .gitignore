@@ -1,4 +1,5 @@
 /bin/
 /proxy
+/hop
 /temp*
 /log*

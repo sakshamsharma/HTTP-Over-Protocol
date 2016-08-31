@@ -2,7 +2,6 @@
 #define PROXY
 
 #include "standard.h"
-#include "proxy_parse.h"
 
 enum Protocol { PLAIN, HTTP };
 enum Modes { CLIENT, SERVER };

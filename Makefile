@@ -23,7 +23,7 @@ all:
 
 proxy: $(SRCFILES)
 	mkdir -p $(OBJ)
-	$(CC) $(LDFLAGS) -o proxy $(SRCFILES) $(LDLIBS) $(INC)
+	$(CC) $(LDFLAGS) -o hop $(SRCFILES) $(LDLIBS) $(INC)
 
 $(OBJ)/%.o: $(SRC)/%.c
 	mkdir -p $(OBJ)
@@ -35,8 +35,4 @@ $(OBJ)/%.o: $(SRC)/%.cpp
 
 clean:
 	rm -rf $(OBJ)
-	rm -f proxy
-
-tar:
-	tar -cvzf ass1.tgz src include README Makefile
-	#tar -cvzf ass1.tgz proxy.c README Makefile proxy_parse.c proxy_parse.h
+	rm -f hop
