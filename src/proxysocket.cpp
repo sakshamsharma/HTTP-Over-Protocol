@@ -98,7 +98,9 @@ int ProxySocket::recvFromSocket(vector<char> &buffer, int from,
             }
         } while (gotHttpHeaders == -1 && k < 50000);
 
-        if (a == 0) {
+        if (connectionBroken == true) {
+            return -1;
+        } else if (a == 0) {
             return 0;
         }
 
