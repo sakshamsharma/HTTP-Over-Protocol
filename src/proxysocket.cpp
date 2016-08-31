@@ -46,7 +46,8 @@ ProxySocket::ProxySocket(char *host, int port, Protocol _outProto) {
     setNonBlocking(fd);
 }
 
-int ProxySocket::recvFromSocket(vector<char> &buffer, int from) {
+int ProxySocket::recvFromSocket(vector<char> &buffer, int from,
+                                int &respFrom) {
 
     a = 0;
     b = 0;
@@ -59,7 +60,6 @@ int ProxySocket::recvFromSocket(vector<char> &buffer, int from) {
             if (retval < 0) {
                 b++;
             } else {
-                //logger << "Got " << retval << " in plain.\n" << &buffer[n];
                 if (retval == 0) {
                     connectionBroken = true;
                     break;
@@ -68,6 +68,7 @@ int ProxySocket::recvFromSocket(vector<char> &buffer, int from) {
                 a += retval;
             }
         } while (b < 50000 && a < 500);
+        respFrom = 0;
 
         logger << "Received " << a << " bytes as plain.";
 
@@ -125,6 +126,8 @@ int ProxySocket::recvFromSocket(vector<char> &buffer, int from) {
 
         from = a+from;
         a = a-gotHttpHeaders;
+        respFrom = gotHttpHeaders;
+        logger << "headers end at " << gotHttpHeaders;
         do {
             retval = recv(fd, &buffer[a+from], BUFSIZE-from-2-a, 0);
             if (retval == 0) {

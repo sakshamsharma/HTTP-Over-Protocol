@@ -34,10 +34,10 @@ void exchangeData(ProxySocket& sock) {
     bool areTheyStillThere = true;
     setNonBlocking(sock.fd);
 
-    int a;
+    int a, b;
 
     do {
-        a = outsock.recvFromSocket(buffer, 0);
+        a = outsock.recvFromSocket(buffer, 0, b);
         if (a == -1) {
             areTheyStillThere = false;
             break;
@@ -46,12 +46,12 @@ void exchangeData(ProxySocket& sock) {
             logger << "Got nothing from remote";
         } else {
             // TODO If sock is HTTP, don't send till there's a request read
-            sock.sendFromSocket(buffer, 0, a);
+            sock.sendFromSocket(buffer, b, a);
             logger << "Sent " << a << " bytes from remote to local";
         }
         buffer[0] = 0;
 
-        a = sock.recvFromSocket(duffer, 0);
+        a = sock.recvFromSocket(duffer, 0, b);
         if (a == -1) {
             areTheyStillThere = false;
             break;
@@ -60,11 +60,11 @@ void exchangeData(ProxySocket& sock) {
             logger << "Got nothing from client";
             // TODO Send empty HTTP requests if outsock is HTTP
         } else {
-            outsock.sendFromSocket(duffer, 0, a);
+            outsock.sendFromSocket(duffer, b, a);
             logger << "Sent " << a << " bytes from local to remote";
         }
         duffer[0] = 0;
-        sleep(2);
+        sleep(1);
     } while (areTheyStillThere);
 }
 
