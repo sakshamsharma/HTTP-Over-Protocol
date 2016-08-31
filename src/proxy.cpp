@@ -47,8 +47,7 @@ void exchangeData(ProxySocket& sock) {
         if (a == -1) {
             // Connection has been broken
             return;
-        }
-        if (a == 0) {
+        } else if (a == 0) {
             logger(DEBUG) << "Got nothing from remote";
         } else {
             // TODO If sock is HTTP, don't send till you get a request
@@ -63,8 +62,7 @@ void exchangeData(ProxySocket& sock) {
         if (a == -1) {
             // Connection has been broken
             return;
-        }
-        if (a == 0) {
+        } else if (a == 0) {
             logger(DEBUG) << "Got nothing from client";
             // TODO Send empty HTTP requests if outsock is HTTP
         } else {

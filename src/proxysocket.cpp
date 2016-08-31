@@ -84,11 +84,12 @@ int ProxySocket::recvFromSocket(vector<char> &buffer, int from,
         k = 0;
         do {
             retval = recv(fd, &buffer[a+from], BUFSIZE-from-2-a, 0);
-            if (retval == 0) {
+            if (retval == -1) {
+                k++;
+            } else if (retval == 0) {
                 connectionBroken = true;
                 break;
-            }
-            if (retval > 0) {
+            } else {
                 k = 0;
                 a += retval;
                 for (b=from; b<a+from-3; b++) {
@@ -100,9 +101,6 @@ int ProxySocket::recvFromSocket(vector<char> &buffer, int from,
                     }
                 }
             }
-            if (retval == -1) {
-                k++;
-            }
         } while (gotHttpHeaders == -1 && k < 50000);
 
         if (connectionBroken == true) {
@@ -111,20 +109,26 @@ int ProxySocket::recvFromSocket(vector<char> &buffer, int from,
             return 0;
         }
 
+        // If it was a normal HTTP response,
+        // we should parse it
         logger(DEBUG) << "Received " << a << " bytes as HTTP headers";
         logger(DEBUG) << &buffer[from];
 
+        // Find content length header
+        // TODO Make this more optimum
         for (b=from; b<a+from; b++) {
             if (strncmp(&buffer[b], "Content-Length: ", 16) == 0) {
                 break;
             }
         }
 
+        // If we couldn't find the header
         if (b == a+from) {
             logger(DEBUG) << "Didn't find content-length in headers";
             return 0;
         }
 
+        // Point @b to the start of the content length int
         b += 17;
         int tp=0;
         while (buffer[b] >= '0' && buffer[b] <= '9') {
@@ -137,6 +141,8 @@ int ProxySocket::recvFromSocket(vector<char> &buffer, int from,
         a = a-gotHttpHeaders;
         respFrom = gotHttpHeaders;
         logger(DEBUG) << "headers end at " << gotHttpHeaders;
+
+        // Read the response
         do {
             retval = recv(fd, &buffer[a+from], BUFSIZE-from-2-a, 0);
             if (retval == 0) {
@@ -148,11 +154,9 @@ int ProxySocket::recvFromSocket(vector<char> &buffer, int from,
             }
         } while (a < tp);
     }
-    if (connectionBroken) {
-        return -1;
-    } else {
-        return a;
-    }
+
+    // Signal error, or return length of message
+    return connectionBroken ? -1 : a;
 }
 
 int ProxySocket::sendFromSocket(vector<char> &buffer, int from, int len) {
