@@ -9,7 +9,7 @@ using namespace std;
 ServerSocket mainSocket;
 char *remoteUrl;
 int remotePort;
-Modes mode = CLIENT;
+Mode mode = CLIENT;
 
 // For closing the sockets safely when Ctrl+C SIGINT is received
 void intHandler(int dummy) {
@@ -25,56 +25,56 @@ void pipeHandler(int dummy) {
 }
 
 void exchangeData(ProxySocket& sock) {
-    vector<char> buffer((BUFSIZE+5)*sizeof(char));
-    vector<char> duffer((BUFSIZE+5)*sizeof(char));
+    vector<char> outBuffer((BUFSIZE+5)*sizeof(char));
+    vector<char> inpBuffer((BUFSIZE+5)*sizeof(char));
 
+    // This socket is HTTP for clients
+    // but PLAIN for the server process
+    // Server process talks to the SSH server
+    // But Client process talks to the evil proxy
     ProxySocket outsock = ProxySocket(remoteUrl, remotePort,
                                       mode==CLIENT?HTTP:PLAIN);
-
-    bool areTheyStillThere = true;
-    setNonBlocking(sock.fd);
-
     int a, b;
-    bool canIRespond = false;
 
     do {
-        a = outsock.recvFromSocket(buffer, 0, b);
+        // @a stores the number of bytes in the message
+        // @b is passed by reference
+        // It will store the position where the actual
+        // message starts.
+        // This is 0 if the message was in plaintext
+        // but will vary in case of HTTP
+        a = outsock.recvFromSocket(outBuffer, 0, b);
         if (a == -1) {
-            areTheyStillThere = false;
-            break;
+            // Connection has been broken
+            return;
         }
         if (a == 0) {
             logger << "Got nothing from remote";
         } else {
-            // TODO If sock is HTTP, don't send till there's a request
-            // read
-            // if (sock.protocol == PLAIN || canIRespond) {
-            //     sock.sendFromSocket(buffer, b, a);
-            //     canIRespond = false;
-            // }
-            sock.sendFromSocket(buffer, b, a);
+            // TODO If sock is HTTP, don't send till you get a request
+            sock.sendFromSocket(outBuffer, b, a);
             logger << "Sent " << a << " bytes from remote to local";
         }
-        buffer[0] = 0;
+        outBuffer[0] = 0;       // To allow sane logging
 
-        a = sock.recvFromSocket(duffer, 0, b);
+        // @a stores number of bytes in message
+        // @b is passed by reference
+        a = sock.recvFromSocket(inpBuffer, 0, b);
         if (a == -1) {
-            areTheyStillThere = false;
-            break;
+            // Connection has been broken
+            return;
         }
         if (a == 0) {
             logger << "Got nothing from client";
-            // if (outsock.protocol == HTTP) {
-            //     outsock.sendEmptyHttp();
-            // }
             // TODO Send empty HTTP requests if outsock is HTTP
         } else {
-            outsock.sendFromSocket(duffer, b, a);
+            outsock.sendFromSocket(inpBuffer, b, a);
             logger << "Sent " << a << " bytes from local to remote";
         }
-        duffer[0] = 0;
+        inpBuffer[0] = 0;       // For sane logging
         usleep(100000);
-    } while (areTheyStillThere);
+
+    } while (1);
 }
 
 int main(int argc, char * argv[]) {

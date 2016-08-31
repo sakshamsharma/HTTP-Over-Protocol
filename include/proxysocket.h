@@ -4,7 +4,7 @@
 #include "standard.h"
 
 enum Protocol { PLAIN, HTTP };
-enum Modes { CLIENT, SERVER };
+enum Mode { CLIENT, SERVER };
 
 class ProxySocket {
 public:
