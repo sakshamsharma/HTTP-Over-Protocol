@@ -11,6 +11,6 @@ public:
     ServerSocket();
     void listenOnPort(int portNumber);
     //void connectToClient(void (*f)(ClientSocket&));
-    void connectToSocket(void (*f)(ProxySocket&));
+    void connectToSocket(void (*f)(ProxySocket&), Modes);
     void closeSocket();
 };

@@ -8,12 +8,15 @@ using namespace std;
 ProxySocket::ProxySocket(int _fd, Protocol _inProto) {
     fd = _fd;
     protocol = _inProto;
+    sprintf(ss, "HTTP/1.1 200 OK\r\nContent-Length");
 
     setNonBlocking(fd);
 }
 
 ProxySocket::ProxySocket(char *host, int port, Protocol _outProto) {
     protocol = _outProto;
+    sprintf(ss, "GET %s / HTTP/1.0\r\nHost: %s:%d\r\nContent-Length",
+            host, host, port);
 
     // Open a socket file descriptor
     fd = socket(AF_INET, SOCK_STREAM, 0);
@@ -31,8 +34,10 @@ ProxySocket::ProxySocket(char *host, int port, Protocol _outProto) {
     servAddr.sin_port = htons(port);
 
     // Connect to the server's socket
-    if (connect(fd, (struct sockaddr *)&servAddr, sizeof(servAddr)) < 0)
+    if (connect(fd, (struct sockaddr *)&servAddr, sizeof(servAddr)) < 0) {
+        logger << "Was connecting to " << host << ":" << port;
         error("Cannot connect to remote server");
+    }
 
     setNonBlocking(fd);
 }
@@ -42,8 +47,9 @@ int ProxySocket::recvFromSocket(vector<char> &buffer, int from) {
     a = 0;
     b = 0;
     connectionBroken = false;
-    gotHttpHeaders = false;
+    gotHttpHeaders = -1;
     if (protocol == PLAIN) {
+        logger << "Recv PLAIN";
         do {
             retval = recv(fd, &buffer[a+from], BUFSIZE-from-2, 0);
             if (retval < 0) {
@@ -62,8 +68,12 @@ int ProxySocket::recvFromSocket(vector<char> &buffer, int from) {
         logger << "Received " << a << " bytes as plain.";
 
     } else if (protocol == HTTP) {
+        logger << "Recv HTTP";
         do {
-            retval = recv(fd, &buffer[a+from], BUFSIZE-from-2, 0);
+            logger << "Loop";
+            retval = recv(fd, &buffer[a+from], BUFSIZE-from-2-a, 0);
+            logger << "Gives " << retval << " after " << a;
+            logger << &buffer[from];
             if (retval == 0) {
                 connectionBroken = true;
                 break;
@@ -73,15 +83,49 @@ int ProxySocket::recvFromSocket(vector<char> &buffer, int from) {
                 for (b=from; b<a+from-3; b++) {
                     if (buffer[b] == '\r' && buffer[b+1] == '\n' &&
                         buffer[b+2] == '\r' && buffer[b+3] == '\n') {
-                        gotHttpHeaders = true;
                         b += 4;
+                        gotHttpHeaders = b-from;
                         break;
                     }
                 }
             }
-        } while (!gotHttpHeaders);
+            sleep(1);
+        } while (gotHttpHeaders == -1);
 
-        logger << "Received " << a << " bytes as HTTP";
+        logger << "Received " << a << " bytes as HTTP headers";
+        logger << &buffer[from];
+
+        for (b=from; b<a+from; b++) {
+            if (strncmp(&buffer[b], "Content-Length: ", 16) == 0) {
+                break;
+            }
+        }
+
+        if (b == a+from) {
+            logger << "Didn't find content-length in headers";
+            return 0;
+        }
+
+        b += 17;
+        int tp=0;
+        while (buffer[b] >= '0' && buffer[b] <= '9') {
+            tp *= 10;
+            tp += buffer[b]-'0';
+            b++;
+        }
+
+        from = a+from;
+        a = a-gotHttpHeaders;
+        do {
+            retval = recv(fd, &buffer[a+from], BUFSIZE-from-2-a, 0);
+            if (retval == 0) {
+                connectionBroken = true;
+                break;
+            }
+            if (retval > 0) {
+                a += retval;
+            }
+        } while (a < tp);
     }
     if (connectionBroken) {
         return -1;
@@ -95,7 +139,19 @@ int ProxySocket::sendFromSocket(vector<char> &buffer, int from, int len) {
     a = 0;
     b = 0;
     if (protocol == PLAIN) {
+        logger << "Write PLAIN";
         a = send(fd, &buffer[from], len, 0);
+    } else if (protocol == HTTP) {
+        logger << "Write HTTP";
+        b = sprintf(headers, "%s: %d\r\n\r\n", ss, len);
+        logger << "Wrote " << headers;
+        a = send(fd, headers, b, 0);
+        if (a < 1) {
+            return -1;
+        }
+        a = send(fd, &buffer[from], len, 0);
+        buffer[from+len] = 0;
+        logger << "Wrote now " << &buffer[from];
     }
     return a;
 }

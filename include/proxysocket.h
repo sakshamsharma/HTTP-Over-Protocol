@@ -5,18 +5,20 @@
 #include "proxy_parse.h"
 
 enum Protocol { PLAIN, HTTP };
-enum Direction { IN, OUT };
+enum Modes { CLIENT, SERVER };
 
 class ProxySocket {
 public:
     int fd;
     struct sockaddr_in servAddr;
     struct hostent *server;
+    char ss[100];
+    char headers[100];
 
     Protocol protocol;
 
-    int a, b, retval;
-    bool connectionBroken, gotHttpHeaders;
+    int a, b, retval, gotHttpHeaders;
+    bool connectionBroken;
 
     ProxySocket(int, Protocol);
     ProxySocket(char *, int, Protocol);

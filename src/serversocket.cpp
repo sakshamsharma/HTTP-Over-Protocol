@@ -24,13 +24,14 @@ void ServerSocket::listenOnPort(int portNumber) {
     listen(mainSocketFd, 30000);
 }
 
-void ServerSocket::connectToSocket(void (*connectionCallback)(ProxySocket&)) {
+void ServerSocket::connectToSocket(void (*connectionCallback)(ProxySocket&),
+                                   Modes mode) {
 
     int c = accept(mainSocketFd, (struct sockaddr *) &client, &clientLen);
     if (c < 0) return;
-    setNonBlocking(c);
+    //setNonBlocking(c);
 
-    ProxySocket sock = ProxySocket(c, PLAIN);
+    ProxySocket sock = ProxySocket(c, mode==CLIENT?PLAIN:HTTP);
 
     info("Connected to client");
 
