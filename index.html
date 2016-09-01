@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset='utf-8'>
+    <meta http-equiv="X-UA-Compatible" content="chrome=1">
+
+    <link rel="stylesheet" type="text/css" href="stylesheets/stylesheet.css" media="screen">
+    <link rel="stylesheet" type="text/css" href="stylesheets/github-dark.css" media="screen">
+    <link rel="stylesheet" type="text/css" href="stylesheets/print.css" media="print">
+
+    <title>Http-over-protocol by sakshamsharma</title>
+  </head>
+
+  <body>
+
+    <header>
+      <div class="container">
+        <h1>Http-over-protocol</h1>
+        <h2>HOP: A proxy server to enable arbitrary protocols behind an HTTP proxy</h2>
+
+        <section id="downloads">
+          <a href="https://github.com/sakshamsharma/HTTP-Over-Protocol/zipball/master" class="btn">Download as .zip</a>
+          <a href="https://github.com/sakshamsharma/HTTP-Over-Protocol/tarball/master" class="btn">Download as .tar.gz</a>
+          <a href="https://github.com/sakshamsharma/HTTP-Over-Protocol" class="btn btn-github"><span class="icon"></span>View on GitHub</a>
+        </section>
+      </div>
+    </header>
+
+    <div class="container">
+      <section id="main_content">
+        <h1>
+<a id="http-over-protocol-hop" class="anchor" href="#http-over-protocol-hop" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>HTTP-Over-Protocol (HOP)</h1>
+
+<h1>
+<a id="introduction" class="anchor" href="#introduction" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Introduction</h1>
+
+<p><strong>HOP</strong> is a tool meant to tunnel any sort of traffic over a standard HTTP channel.</p>
+
+<p>Useful for scenarios where there's a proxy filtering all traffic except standard HTTP(S) traffic.</p>
+
+<h1>
+<a id="working" class="anchor" href="#working" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Working</h1>
+
+<p>Assuming you want to use SSH to connect to a remote machine where you don't have root privileges.</p>
+
+<p>There will be 7 entities:</p>
+
+<ol>
+<li>Client (Your computer, behind the proxy)</li>
+<li>Proxy (Evil)</li>
+<li>Target Server (The remote machine you want to SSH to, from Client)</li>
+<li>Client HOP process</li>
+<li>Target HOP process</li>
+<li>Client SSH process</li>
+<li>Target SSH process</li>
+</ol>
+
+<p>If there was no proxy, the communication would be something like:</p>
+
+<pre><code>Client -&gt; Client SSH process -&gt; Target Server -&gt; Target SSH process
+</code></pre>
+
+<p>In this scenario, here's the proposed method:</p>
+
+<pre><code>Client -&gt; Client SSH process -&gt; Client HOP process -&gt; Proxy -&gt; Target HOP process -&gt; Target SSH process -&gt; Target Server
+</code></pre>
+
+<p><strong>HOP</strong> simply wraps all the data in HTTP packets, and buffers them accordingly.</p>
+
+<p>Another even more complicated scenario would be if you have an external utility server, and need to access another server's
+resources from behind a proxy. In this case, <em>hop</em> will still run on your external server, but instead of using <code>localhost</code>
+in the second command (Usage section), use the hostname of the target machine which has the host.</p>
+
+<h1>
+<a id="usage" class="anchor" href="#usage" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Usage</h1>
+
+<p>On the client machine:</p>
+
+<pre><code>./hop &lt;client-hop-port&gt; &lt;server-host-name&gt; &lt;server-hop-port&gt;
+</code></pre>
+
+<p>On the target machine:</p>
+
+<pre><code>./hop &lt;server-hop-port&gt; localhost &lt;target-port&gt; SERVER
+</code></pre>
+
+<p>(Note the keyword SERVER at the end)</p>
+
+<p>In case of SSH, the target-port would be 22.
+Now once these 2 are running, to SSH you would run the following:</p>
+
+<pre><code>ssh &lt;target-machine-username&gt;@localhost -p &lt;client-hop-port&gt;
+</code></pre>
+
+<p><em>Note</em>: The keyword server tells <em>hop</em> which side of the connection has to be over HTTP.</p>
+
+<h1>
+<a id="bugs" class="anchor" href="#bugs" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Bugs</h1>
+
+<ul>
+<li>Currently uses a 100ms sleep after every send/receive cycle to allow for synchonizations.</li>
+<li>HTTP Responses may come before HTTP Requests. Let me know if you know of some proxy which blocks such responses.</li>
+</ul>
+
+<h1>
+<a id="planned-features" class="anchor" href="#planned-features" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Planned features</h1>
+
+<ul>
+<li>Better and adaptive buffering</li>
+<li>Better CLI flags interface</li>
+</ul>
+      </section>
+    </div>
+
+    
+  </body>
+</html>
