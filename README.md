@@ -63,3 +63,7 @@ ssh <target-machine-username>@localhost -p <client-hop-port>
 # Planned features
 * Better and adaptive buffering
 * Better CLI flags interface
+* Parsing of .ssh/config file for hosts
+* Web interface for remote server admin
+* Web interface for local host
+* Daemon mode for certain configs
