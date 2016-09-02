@@ -92,7 +92,7 @@ int main(int argc, char * argv[]) {
     // CLI argument parsing
     if (argc != 4 && argc != 5) {
         logger(ERROR) <<
-            "Usage format: ./http-server <local port> <remote url> <remotePort>";
+            "Usage format: ./hop <local port> <remote url> <remotePort>";
         exit(0);
     }
 
