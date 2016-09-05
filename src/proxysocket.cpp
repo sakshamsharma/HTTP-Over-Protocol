@@ -189,7 +189,7 @@ int ProxySocket::recvFromSocket(vector<char> &buffer, int from,
         logger(VERB1) << "HTTP connection broken but will try again";
         return 0;
     } else {
-        logger(VERB1) << "Received " << receivedBytes << "as HTTP, sending to other end";
+        logger(VERB1) << "Received " << receivedBytes << " as HTTP, sending to other end";
         return receivedBytes;
     }
 }
