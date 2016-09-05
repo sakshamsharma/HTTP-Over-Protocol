@@ -56,161 +56,166 @@ ProxySocket::ProxySocket(char *host, int port, Protocol _outProto) {
 int ProxySocket::recvFromSocket(vector<char> &buffer, int from,
                                 int &respFrom) {
 
-    a = 0;
-    b = 0;
+    receivedBytes = 0;
+    numberOfFailures = 0;
     connectionBroken = false;
     gotHttpHeaders = -1;
     if (protocol == PLAIN) {
         logger(DEBUG) << "Recv PLAIN";
         do {
-            retval = recv(fd, &buffer[a+from], BUFSIZE-from-2, 0);
+            retval = recv(fd, &buffer[receivedBytes+from],
+                          BUFSIZE-from-2-receivedBytes, 0);
             if (retval < 0) {
-                b++;
+                numberOfFailures++;
             } else {
                 if (retval == 0) {
                     connectionBroken = true;
                     break;
                 }
-                b = 0;
-                a += retval;
+                numberOfFailures = 0;
+                receivedBytes += retval;
             }
-        } while (b < 50000 && a < 500);
+            // Now loop till either we don't receive anything for
+            // 50000 bytes, or we've got 500 bytes of data
+            // Both these are to ensure decent latency
+        } while (numberOfFailures < 50000 && receivedBytes < 500);
         respFrom = 0;
 
-        logger(DEBUG) << "Received " << a << " bytes as plain.";
+        logger(DEBUG) << "Received " << receivedBytes << " bytes as plain.";
 
     } else if (protocol == HTTP) {
         logger(DEBUG) << "Recv HTTP";
-        k = 0;
+        numberOfFailures = 0;
         do {
-            retval = recv(fd, &buffer[a+from], BUFSIZE-from-2-a, 0);
+            retval = recv(fd, &buffer[receivedBytes+from],
+                          BUFSIZE-from-2-receivedBytes, 0);
             if (retval == -1) {
-                k++;
+                numberOfFailures++;
             } else if (retval == 0) {
                 connectionBroken = true;
                 break;
             } else {
-                k = 0;
-                a += retval;
-                for (b=from; b<a+from-3; b++) {
-                    if (buffer[b] == '\r' && buffer[b+1] == '\n' &&
-                        buffer[b+2] == '\r' && buffer[b+3] == '\n') {
-                        b += 4;
-                        gotHttpHeaders = b-from;
+                numberOfFailures = 0;
+                receivedBytes += retval;
+                for (k=from; k<receivedBytes+from-3; k++) {
+                    if (buffer[k] == '\r' && buffer[k+1] == '\n' &&
+                        buffer[k+2] == '\r' && buffer[k+3] == '\n') {
+                        k += 4;
+                        gotHttpHeaders = k-from;
                         break;
                     }
                 }
             }
-        } while (gotHttpHeaders == -1 && k < 50000);
+        } while (gotHttpHeaders == -1 && numberOfFailures < 50000);
 
         if (connectionBroken == true) {
             return -1;
-        } else if (a == 0) {
+        } else if (receivedBytes == 0) {
             return 0;
         }
 
         // If it was a normal HTTP response,
         // we should parse it
-        logger(DEBUG) << "Received " << a << " bytes as HTTP headers";
+        logger(DEBUG) << "Received " << receivedBytes << " bytes as HTTP headers";
         logger(DEBUG) << &buffer[from];
 
         // Find content length header
         // TODO Make this more optimum
-        for (b=from; b<a+from; b++) {
-            if (strncmp(&buffer[b], "Content-Length: ", 16) == 0) {
+        for (k=from; k<receivedBytes+from; k++) {
+            if (strncmp(&buffer[k], "Content-Length: ", 16) == 0) {
                 break;
             }
         }
 
         // If we couldn't find the header
-        if (b == a+from) {
+        if (k == receivedBytes+from) {
             logger(DEBUG) << "Didn't find content-length in headers";
             return 0;
         }
 
         // Point @b to the start of the content length int
-        b += 17;
+        k += 17;
         int tp=0;
-        while (buffer[b] >= '0' && buffer[b] <= '9') {
+        while (buffer[k] >= '0' && buffer[k] <= '9') {
             tp *= 10;
-            tp += buffer[b]-'0';
-            b++;
+            tp += buffer[k]-'0';
+            k++;
         }
 
-        from = a+from;
-        a = a-gotHttpHeaders;
+        from = receivedBytes+from;
+        receivedBytes = receivedBytes-gotHttpHeaders;
         respFrom = gotHttpHeaders;
         logger(DEBUG) << "headers end at " << gotHttpHeaders;
 
         // Read the response
         do {
-            retval = recv(fd, &buffer[a+from], BUFSIZE-from-2-a, 0);
+            retval = recv(fd, &buffer[receivedBytes+from],
+                          BUFSIZE-from-2-receivedBytes, 0);
             if (retval == 0) {
                 connectionBroken = true;
                 break;
             }
             if (retval > 0) {
-                a += retval;
+                receivedBytes += retval;
             }
-        } while (a < tp);
+        } while (receivedBytes < tp);
     }
 
     // Signal error, or return length of message
-    return connectionBroken ? -1 : a;
+    return connectionBroken ? -1 : receivedBytes;
 }
 
 int ProxySocket::sendFromSocket(vector<char> &buffer, int from, int len) {
 
-    a = 0;
-    b = 0;
+    sentBytes = 0;
+    numberOfFailures = 0;
     if (protocol == PLAIN) {
         logger(DEBUG) << "Write PLAIN";
-        a = send(fd, &buffer[from], len, 0);
+        sentBytes = send(fd, &buffer[from], len, 0);
     } else if (protocol == HTTP) {
         logger(DEBUG) << "Write HTTP";
-        b = sprintf(headers, "%s: %d\r\n\r\n", ss, len);
+        writtenBytes = sprintf(headers, "%s: %d\r\n\r\n", ss, len);
         logger(DEBUG) << "Wrote " << headers;
-        a = send(fd, headers, b, 0);
-        if (a < 1) {
+        sentBytes = send(fd, headers, writtenBytes, 0);
+        if (sentBytes < 1) {
             return -1;
         }
-        a = send(fd, &buffer[from], len, 0);
+        sentBytes = send(fd, &buffer[from], len, 0);
         buffer[from+len] = 0;
         logger(DEBUG) << "Wrote now " << &buffer[from];
     }
-    return a;
+    return sentBytes;
 }
 
 void ProxySocket::sendHelloMessage() {
     logger(VERB1) << "Sending hello handshake";
-    a = 0;
-    b = 0;
+    sentBytes = 0;
+    writtenBytes = 0;
     do {
-        b = send(fd, "GET / HTTP/1.1\r\n\r\n", 18, 0);
-        if (b == 0) {
+        writtenBytes = send(fd, "GET / HTTP/1.1\r\n\r\n", 18, 0);
+        if (writtenBytes == 0) {
             logger(ERROR) << "Connection closed at handshake";
             exit(0);
-        } else if (b > 0) {
-            a += b;
+        } else if (writtenBytes > 0) {
+            sentBytes += writtenBytes;
         }
-    } while (a < 18);
+    } while (sentBytes < 18);
     logger(VERB1) << "Sent handshake";
 }
 
 void ProxySocket::receiveHelloMessage() {
     logger(VERB1) << "Receiving hello handshake";
-    a = 0;
-    b = 0;
+    receivedBytes = 0;
     char tmp[20];
     do {
-        b = recv(fd, tmp, 18, 0);
-        if (b == 0) {
+        readBytes = recv(fd, tmp, 18, 0);
+        if (readBytes == 0) {
             logger(ERROR) << "Connection closed at handshake";
             exit(0);
-        } else if (b > 0) {
-            a += b;
+        } else if (readBytes > 0) {
+            receivedBytes += readBytes;
         }
-    } while (a < 18);
+    } while (receivedBytes < 18);
     logger(VERB1) << "Received handshake";
 }
 

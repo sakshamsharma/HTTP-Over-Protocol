@@ -11,12 +11,13 @@ public:
     int fd;
     struct sockaddr_in servAddr;
     struct hostent *server;
-    char ss[100];
-    char headers[100];
+    char ss[513];
+    char headers[513];
 
     Protocol protocol;
 
-    int a, b, retval, gotHttpHeaders, k;
+    int retval, gotHttpHeaders, k;
+    int receivedBytes, sentBytes, writtenBytes, readBytes, numberOfFailures;
     bool connectionBroken;
 
     ProxySocket(int, Protocol);

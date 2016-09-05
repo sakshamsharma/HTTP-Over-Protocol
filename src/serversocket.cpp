@@ -27,7 +27,7 @@ void ServerSocket::listenOnPort(int portNumber) {
         logger(ERROR) << "Could not bind to socket";
         exit(0);
     }
-    listen(mainSocketFd, 1000);
+    listen(mainSocketFd, 10);
 }
 
 void ServerSocket::connectToSocket(void (*connectionCallback)(ProxySocket&),
