@@ -28,6 +28,8 @@ void exchangeData(ProxySocket& sock) {
     vector<char> outBuffer((BUFSIZE+5)*sizeof(char));
     vector<char> inpBuffer((BUFSIZE+5)*sizeof(char));
 
+    int failures = 0;
+
     // This socket is HTTP for clients
     // but PLAIN for the server process
     // Server process talks to the SSH server
@@ -53,11 +55,13 @@ void exchangeData(ProxySocket& sock) {
         a = outsock.recvFromSocket(outBuffer, 0, b);
         if (a == -1) {
             // Connection has been broken
-            return;
+            failures++;
         } else if (a == 0) {
             logger(DEBUG) << "Got nothing from remote";
+            failures = 0;
         } else {
             // TODO If sock is HTTP, don't send till you get a request
+            failures = 0;
             sock.sendFromSocket(outBuffer, b, a);
             logger(DEBUG) << "Sent " << a << " bytes from remote to local";
         }
@@ -68,18 +72,19 @@ void exchangeData(ProxySocket& sock) {
         a = sock.recvFromSocket(inpBuffer, 0, b);
         if (a == -1) {
             // Connection has been broken
-            return;
+            failures++;
         } else if (a == 0) {
             logger(DEBUG) << "Got nothing from client";
+            failures = 0;
             // TODO Send empty HTTP requests if outsock is HTTP
         } else {
+            failures = 0;
             outsock.sendFromSocket(inpBuffer, b, a);
             logger(DEBUG) << "Sent " << a << " bytes from local to remote";
         }
         inpBuffer[0] = 0;       // For sane logging
         usleep(100000);
-
-    } while (1);
+    } while (failures < 10);
 }
 
 int main(int argc, char * argv[]) {

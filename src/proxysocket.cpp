@@ -76,9 +76,11 @@ int ProxySocket::recvFromSocket(vector<char> &buffer, int from,
                     connectionBroken = true;
                     logger(VERB1) << "PLAIN connection broken";
                     numberOfFailures += 10000;
+                } else {
+                    connectionBroken = false;
+                    numberOfFailures = 0;
+                    receivedBytes += retval;
                 }
-                numberOfFailures = 0;
-                receivedBytes += retval;
             }
             // Now loop till either we don't receive anything for
             // 50000 bytes, or we've got 500 bytes of data
@@ -87,6 +89,13 @@ int ProxySocket::recvFromSocket(vector<char> &buffer, int from,
         respFrom = 0;
 
         logger(DEBUG) << "Received " << receivedBytes << " bytes as plain.";
+
+        if (connectionBroken == true && receivedBytes == 0) {
+            logger(VERB1) << "Exiting because of broken Plain connection";
+            return -1;
+        } else if (connectionBroken == true) {
+            logger(VERB1) << "PLAIN connection broken but will try again";
+        }
 
     } else if (protocol == HTTP) {
         logger(DEBUG) << "Recv HTTP";
@@ -98,9 +107,10 @@ int ProxySocket::recvFromSocket(vector<char> &buffer, int from,
                 numberOfFailures++;
             } else if (retval == 0) {
                 connectionBroken = true;
-                logger(VERB1) << "HTTP Connection broken";
+                logger(VERB1) << "HTTP connection broken";
                 numberOfFailures += 10000;
             } else {
+                connectionBroken = false;
                 numberOfFailures = 0;
                 receivedBytes += retval;
                 for (k=from; k<receivedBytes+from-3; k++) {
@@ -114,11 +124,13 @@ int ProxySocket::recvFromSocket(vector<char> &buffer, int from,
             }
         } while (gotHttpHeaders == -1 && numberOfFailures < 50000);
 
-        if (connectionBroken == true) {
-            logger(VERB1) << "Exiting because of broken connection";
+        if (connectionBroken == true && receivedBytes == 0) {
+            logger(VERB1) << "Exiting because of broken HTTP connection";
             return -1;
         } else if (receivedBytes == 0) {
             return 0;
+        } else if (connectionBroken == true) {
+            logger(VERB1) << "HTTP connection broken but will try again";
         }
 
         // If it was a normal HTTP response,
@@ -170,7 +182,16 @@ int ProxySocket::recvFromSocket(vector<char> &buffer, int from,
     }
 
     // Signal error, or return length of message
-    return connectionBroken ? -1 : receivedBytes;
+    if (connectionBroken == true && receivedBytes == 0) {
+        logger(VERB1) << "Exiting because of broken HTTP connection when receiving content";
+        return -1;
+    } else if (connectionBroken == true) {
+        logger(VERB1) << "HTTP connection broken but will try again";
+        return 0;
+    } else {
+        logger(VERB1) << "Received " << receivedBytes << "as HTTP, sending to other end";
+        return receivedBytes;
+    }
 }
 
 int ProxySocket::sendFromSocket(vector<char> &buffer, int from, int len) {
