@@ -11,8 +11,8 @@ public:
     int fd;
     struct sockaddr_in servAddr;
     struct hostent *server;
-    char ss[513];
-    char headers[513];
+    char ss[MAXHOSTBUFFERSIZE+1];
+    char headers[MAXHOSTBUFFERSIZE+5];
 
     Protocol protocol;
 

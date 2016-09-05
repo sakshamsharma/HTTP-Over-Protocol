@@ -10,7 +10,7 @@ ProxySocket::ProxySocket(int _fd, Protocol _inProto) {
     protocol = _inProto;
     logger(DEBUG) << "Accepted connection";
     logger(DEBUG) << "This connection is in " << (protocol==PLAIN?"PLAIN":"HTTP");
-    sprintf(ss, "HTTP/1.1 200 OK\r\nContent-Length");
+    snprintf(ss, MAXHOSTBUFFERSIZE, "HTTP/1.1 200 OK\r\nContent-Length");
 
     setNonBlocking(fd);
 }
@@ -19,8 +19,12 @@ ProxySocket::ProxySocket(char *host, int port, Protocol _outProto) {
     protocol = _outProto;
     logger(DEBUG) << "Making outgoing connection to " << host << ":" << port;
     logger(DEBUG) << "This connection is in " << (protocol==PLAIN?"PLAIN":"HTTP");
-    sprintf(ss, "GET %s / HTTP/1.0\r\nHost: %s:%d\r\nContent-Length",
-            host, host, port);
+    if (snprintf(ss, MAXHOSTBUFFERSIZE,
+                 "GET %s / HTTP/1.0\r\nHost: %s:%d\r\nContent-Length",
+                 host, host, port) >= MAXHOSTBUFFERSIZE) {
+        logger(ERROR) << "Host name too long";
+        exit(0);
+    };
 
     // Open a socket file descriptor
     fd = socket(AF_INET, SOCK_STREAM, 0);
@@ -70,7 +74,8 @@ int ProxySocket::recvFromSocket(vector<char> &buffer, int from,
             } else {
                 if (retval == 0) {
                     connectionBroken = true;
-                    break;
+                    logger(VERB1) << "PLAIN connection broken";
+                    numberOfFailures += 10000;
                 }
                 numberOfFailures = 0;
                 receivedBytes += retval;
@@ -93,7 +98,8 @@ int ProxySocket::recvFromSocket(vector<char> &buffer, int from,
                 numberOfFailures++;
             } else if (retval == 0) {
                 connectionBroken = true;
-                break;
+                logger(VERB1) << "HTTP Connection broken";
+                numberOfFailures += 10000;
             } else {
                 numberOfFailures = 0;
                 receivedBytes += retval;
@@ -109,6 +115,7 @@ int ProxySocket::recvFromSocket(vector<char> &buffer, int from,
         } while (gotHttpHeaders == -1 && numberOfFailures < 50000);
 
         if (connectionBroken == true) {
+            logger(VERB1) << "Exiting because of broken connection";
             return -1;
         } else if (receivedBytes == 0) {
             return 0;
@@ -153,6 +160,7 @@ int ProxySocket::recvFromSocket(vector<char> &buffer, int from,
                           BUFSIZE-from-2-receivedBytes, 0);
             if (retval == 0) {
                 connectionBroken = true;
+                logger(VERB1) << "HTTP Connection broken when receiving bytes";
                 break;
             }
             if (retval > 0) {
@@ -174,7 +182,13 @@ int ProxySocket::sendFromSocket(vector<char> &buffer, int from, int len) {
         sentBytes = send(fd, &buffer[from], len, 0);
     } else if (protocol == HTTP) {
         logger(DEBUG) << "Write HTTP";
-        writtenBytes = sprintf(headers, "%s: %d\r\n\r\n", ss, len);
+        writtenBytes = snprintf(headers, MAXHOSTBUFFERSIZE+4,
+                                "%s: %d\r\n\r\n", ss, len);
+        if (writtenBytes >= MAXHOSTBUFFERSIZE+4) {
+            logger(ERROR) << "Host name or content too long";
+            exit(0);
+        }
+
         logger(DEBUG) << "Wrote " << headers;
         sentBytes = send(fd, headers, writtenBytes, 0);
         if (sentBytes < 1) {

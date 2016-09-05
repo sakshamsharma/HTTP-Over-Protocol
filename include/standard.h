@@ -25,5 +25,6 @@
 #include <string>
 
 #define BUFSIZE 65535
+#define MAXHOSTBUFFERSIZE 512
 #define LINPRINT printf("--%d--\n", __LINE__)
 #define uchar unsigned char
