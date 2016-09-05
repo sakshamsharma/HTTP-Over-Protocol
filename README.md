@@ -14,7 +14,7 @@ A friend once told me that his university has an HTTP(S)-only proxy, and thus he
 
 **HOP** is a tool meant to tunnel any sort of traffic over a standard HTTP channel.
 
-Useful for scenarios where there's a proxy filtering all traffic except standard HTTP(S) traffic.
+Useful for scenarios where there's a proxy filtering all traffic except standard HTTP(S) traffic. Unlike other tools which either require you to be behind a proxy which let's you pass arbitrary traffic (possibly after an initial CONNECT request), or tools which work only for SSH, this imposes no such restrictions.
 
 # Working
 Assuming you want to use SSH to connect to a remote machine where you don't have root privileges.
