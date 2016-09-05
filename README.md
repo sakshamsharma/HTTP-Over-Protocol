@@ -66,6 +66,7 @@ I've put down a list of possible ideas if you would like to contribute.
 # Bugs
 * Currently uses a 100ms sleep after every send/receive cycle to allow for synchonizations.
 * HTTP Responses may come before HTTP Requests. Let me know if you know of some proxy which blocks such responses.
+* Some SSH connections break after a while, with a noticed extra connection being opened by SSH itself (on the client side). Suspected SSH attempting to create a replacement connection and killing the original connection. See issue #1
 
 # Planned features
 * Better and adaptive buffering
