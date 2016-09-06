@@ -18,7 +18,7 @@ ProxySocket::ProxySocket(int _fd, Protocol _inProto) {
 
 ProxySocket::ProxySocket(char *host, int port, Protocol _outProto) {
     protocol = _outProto;
-    lock = 1;
+    lock = 0;
     logger(DEBUG) << "Making outgoing connection to " << host << ":" << port;
     logger(DEBUG) << "This connection is in " << (protocol==PLAIN?"PLAIN":"HTTP");
     if (snprintf(ss, MAXHOSTBUFFERSIZE,

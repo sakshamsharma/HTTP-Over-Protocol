@@ -71,7 +71,7 @@ void *remoteToListener(void *context) {
         }
         outBuffer[0] = 0;       // To allow sane logging
         if (failuresOut != 0) {
-            logger(WARN, "RTL") << "Input failures: " << failuresOut;
+            logger(WARN, "RTL") << "Output failures: " << failuresOut;
         }
         usleep(SLEEPT);
     } while (failuresOut < 10 && listenerToRemoteOn == true);
@@ -130,19 +130,19 @@ void exchangeData(ProxySocket& sock) {
                                       mode==CLIENT?HTTP:PLAIN);
 
     if (mode == CLIENT) {
-        logger(VERB1) << "Receiving hello handshake";
-        outsock.sendHelloMessage();
-        logger(VERB1) << "Received handshake";
-    } else {
         logger(VERB1) << "Sending hello handshake";
-        sock.receiveHelloMessage();
+        outsock.sendHelloMessage();
         logger(VERB1) << "Sent handshake";
+    } else {
+        logger(VERB1) << "Receiving hello handshake";
+        sock.receiveHelloMessage();
+        logger(VERB1) << "Received handshake";
     }
 
     remoteToListenerOn = true;
     listenerToRemoteOn = true;
 
-    static struct connectionSockets context = {
+    struct connectionSockets context = {
         sock, outsock
     };
 
