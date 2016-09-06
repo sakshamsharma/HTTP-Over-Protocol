@@ -66,6 +66,7 @@ int ProxySocket::recvFromSocket(vector<char> &buffer, int from,
         lock = 1;
     }
 
+    contentBytes = 0;
     receivedBytes = 0;
     numberOfFailures = 0;
     connectionBroken = false;
@@ -103,6 +104,7 @@ int ProxySocket::recvFromSocket(vector<char> &buffer, int from,
         } else if (connectionBroken == true) {
             logger(VERB1) << "PLAIN connection broken but will try again";
         }
+        contentBytes = receivedBytes;
 
     } else if (protocol == HTTP) {
         logger(DEBUG) << "Recv HTTP";
@@ -171,28 +173,47 @@ int ProxySocket::recvFromSocket(vector<char> &buffer, int from,
             k++;
         }
 
-        from = receivedBytes+from;
-        receivedBytes = receivedBytes-gotHttpHeaders;
-        respFrom = gotHttpHeaders;
-        logger(DEBUG) << "headers end at " << gotHttpHeaders;
+        contentLength = tp; // just rename tp to contentLength
 
-        // Read the response
-        do {
-            retval = recv(fd, &buffer[receivedBytes+from],
-                          BUFSIZE-from-2-receivedBytes, 0);
+        // for clarity, this variable should be the
+        // number of bytes into the buffer where the header end and
+        // content starts.
+        startOfContent = gotHttpHeaders;
+
+        respFrom = startOfContent; // Update this reference int
+
+        // How many bytes we've read of the content
+        contentBytes = receivedBytes - startOfContent;
+        bufferBytesRemaining = BUFSIZE-from-receivedBytes-2;
+
+        while(contentBytes < contentLength && bufferBytesRemaining > 0) {
+
+            // from is where the caller said start writing
+            // contentBytes is how many bytes we've read making
+            // up part of the content.
+            // receivedBytes is the total number of bytes we've read
+            // (marking the end of our buffer's valid content)
+            // bufferBytesRemaining is how many bytes we have
+            // remaining in the receive buffer
+
+            retval = recv(fd, &buffer[from+startOfContent+contentBytes],
+                          bufferBytesRemaining, 0);
+
             if (retval == 0) {
                 connectionBroken = true;
                 logger(VERB1) << "HTTP Connection broken when receiving bytes";
                 break;
-            }
-            if (retval > 0) {
+            } else if (retval > 0) {
                 receivedBytes += retval;
+                contentBytes += retval;
+                bufferBytesRemaining -= retval;
             }
-        } while (receivedBytes < tp);
+        }
+
     }
 
     // Signal error, or return length of message
-    if (connectionBroken == true && receivedBytes == 0) {
+    if (connectionBroken == true && contentBytes == 0) {
         logger(VERB1) << "Exiting because of broken HTTP connection when receiving content";
         lock = 0;
         return -1;
@@ -201,9 +222,9 @@ int ProxySocket::recvFromSocket(vector<char> &buffer, int from,
         lock = 0;
         return 0;
     } else {
-        logger(VERB1) << "Received " << receivedBytes << " as HTTP, sending to other end";
+        logger(VERB2) << "Received " << contentBytes << " as HTTP, sending to other end";
         lock = 0;
-        return receivedBytes;
+        return contentBytes;
     }
 }
 

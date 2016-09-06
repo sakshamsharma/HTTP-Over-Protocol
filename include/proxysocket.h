@@ -20,6 +20,7 @@ public:
     int retval, gotHttpHeaders, k;
     int receivedBytes, sentBytes, writtenBytes, readBytes, numberOfFailures;
     bool connectionBroken;
+    int contentBytes, startOfContent, bufferBytesRemaining, contentLength;
 
     ProxySocket(int, Protocol);
     ProxySocket(char *, int, Protocol);

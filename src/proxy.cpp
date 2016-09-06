@@ -51,6 +51,7 @@ void *remoteToListener(void *context) {
         // This is 0 if the message was in plaintext
         // but will vary in case of HTTP
         a = outsock.recvFromSocket(outBuffer, 0, b);
+        logger(VERB1) << "Got " << a << " bytes on outsocket";
         if (a == -1) {
             // Connection has been broken
             failuresOut++;
@@ -60,6 +61,7 @@ void *remoteToListener(void *context) {
         } else {
             // TODO If sock is HTTP, don't send till you get a request
             c = csock.sendFromSocket(outBuffer, b, a);
+            logger(VERB1) << "Wrote " << c << " bytes on insocket";
             if (c == -1) {
                 failuresOut++;
             } else {
@@ -90,6 +92,7 @@ void *listenerToRemote(void *context) {
         // @a stores number of bytes in message
         // @b is passed by reference
         a = csock.recvFromSocket(inpBuffer, 0, b);
+        logger(VERB1) << "Got " << a << " bytes from insocket";
         if (a == -1) {
             // Connection has been broken
             failuresIn++;
@@ -99,6 +102,7 @@ void *listenerToRemote(void *context) {
             // TODO Send empty HTTP requests if outsock is HTTP
         } else {
             c = outsock.sendFromSocket(inpBuffer, b, a);
+            logger(VERB1) << "Wrote " << c << " bytes into outsocket";
             logger(DEBUG) << "Sent " << c << "/" << a << " bytes from local to remote";
             if (c == -1) {
                 failuresIn++;
