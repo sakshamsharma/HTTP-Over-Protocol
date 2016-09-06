@@ -23,7 +23,7 @@ all:
 
 proxy: $(SRCFILES)
 	mkdir -p $(OBJ)
-	$(CC) $(LDFLAGS) -o hop $(SRCFILES) $(LDLIBS) $(INC)
+	$(CC) $(LDFLAGS) -o hop $(SRCFILES) $(LDLIBS) $(INC) -lpthread
 
 $(OBJ)/%.o: $(SRC)/%.c
 	mkdir -p $(OBJ)

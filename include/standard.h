@@ -7,6 +7,7 @@
 #include <netinet/in.h>
 #include <netdb.h>
 #include <arpa/inet.h>
+#include <pthread.h>
 #include <signal.h>
 #include <dirent.h>
 #include <sys/select.h>

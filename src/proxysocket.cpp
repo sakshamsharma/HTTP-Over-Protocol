@@ -7,6 +7,7 @@ using namespace std;
 
 ProxySocket::ProxySocket(int _fd, Protocol _inProto) {
     fd = _fd;
+    lock = 0;
     protocol = _inProto;
     logger(DEBUG) << "Accepted connection";
     logger(DEBUG) << "This connection is in " << (protocol==PLAIN?"PLAIN":"HTTP");
@@ -17,6 +18,7 @@ ProxySocket::ProxySocket(int _fd, Protocol _inProto) {
 
 ProxySocket::ProxySocket(char *host, int port, Protocol _outProto) {
     protocol = _outProto;
+    lock = 1;
     logger(DEBUG) << "Making outgoing connection to " << host << ":" << port;
     logger(DEBUG) << "This connection is in " << (protocol==PLAIN?"PLAIN":"HTTP");
     if (snprintf(ss, MAXHOSTBUFFERSIZE,
@@ -59,6 +61,10 @@ ProxySocket::ProxySocket(char *host, int port, Protocol _outProto) {
 
 int ProxySocket::recvFromSocket(vector<char> &buffer, int from,
                                 int &respFrom) {
+    while (lock != 1) {
+        while (lock != 0);
+        lock = 1;
+    }
 
     receivedBytes = 0;
     numberOfFailures = 0;
@@ -92,6 +98,7 @@ int ProxySocket::recvFromSocket(vector<char> &buffer, int from,
 
         if (connectionBroken == true && receivedBytes == 0) {
             logger(VERB1) << "Exiting because of broken Plain connection";
+            lock = 0;
             return -1;
         } else if (connectionBroken == true) {
             logger(VERB1) << "PLAIN connection broken but will try again";
@@ -126,8 +133,10 @@ int ProxySocket::recvFromSocket(vector<char> &buffer, int from,
 
         if (connectionBroken == true && receivedBytes == 0) {
             logger(VERB1) << "Exiting because of broken HTTP connection";
+            lock = 0;
             return -1;
         } else if (receivedBytes == 0) {
+            lock = 0;
             return 0;
         } else if (connectionBroken == true) {
             logger(VERB1) << "HTTP connection broken but will try again";
@@ -149,6 +158,7 @@ int ProxySocket::recvFromSocket(vector<char> &buffer, int from,
         // If we couldn't find the header
         if (k == receivedBytes+from) {
             logger(DEBUG) << "Didn't find content-length in headers";
+            lock = 0;
             return 0;
         }
 
@@ -184,17 +194,25 @@ int ProxySocket::recvFromSocket(vector<char> &buffer, int from,
     // Signal error, or return length of message
     if (connectionBroken == true && receivedBytes == 0) {
         logger(VERB1) << "Exiting because of broken HTTP connection when receiving content";
+        lock = 0;
         return -1;
     } else if (connectionBroken == true) {
         logger(VERB1) << "HTTP connection broken but will try again";
+        lock = 0;
         return 0;
     } else {
         logger(VERB1) << "Received " << receivedBytes << " as HTTP, sending to other end";
+        lock = 0;
         return receivedBytes;
     }
 }
 
 int ProxySocket::sendFromSocket(vector<char> &buffer, int from, int len) {
+
+    while (lock != 2) {
+        while (lock != 0);
+        lock = 2;
+    }
 
     sentBytes = 0;
     numberOfFailures = 0;
@@ -213,17 +231,18 @@ int ProxySocket::sendFromSocket(vector<char> &buffer, int from, int len) {
         logger(DEBUG) << "Wrote " << headers;
         sentBytes = send(fd, headers, writtenBytes, 0);
         if (sentBytes < 1) {
+            lock = 0;
             return -1;
         }
         sentBytes = send(fd, &buffer[from], len, 0);
         buffer[from+len] = 0;
         logger(DEBUG) << "Wrote now " << &buffer[from];
     }
+    lock = 0;
     return sentBytes;
 }
 
 void ProxySocket::sendHelloMessage() {
-    logger(VERB1) << "Sending hello handshake";
     sentBytes = 0;
     writtenBytes = 0;
     do {
@@ -235,11 +254,9 @@ void ProxySocket::sendHelloMessage() {
             sentBytes += writtenBytes;
         }
     } while (sentBytes < 18);
-    logger(VERB1) << "Sent handshake";
 }
 
 void ProxySocket::receiveHelloMessage() {
-    logger(VERB1) << "Receiving hello handshake";
     receivedBytes = 0;
     char tmp[20];
     do {
@@ -251,7 +268,6 @@ void ProxySocket::receiveHelloMessage() {
             receivedBytes += readBytes;
         }
     } while (receivedBytes < 18);
-    logger(VERB1) << "Received handshake";
 }
 
 void ProxySocket::closeSocket() {
