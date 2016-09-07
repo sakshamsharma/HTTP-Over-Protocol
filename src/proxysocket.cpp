@@ -138,7 +138,7 @@ int ProxySocket::read(vector<char> &buffer, int from, int& respFrom) {
     bool connectionBroken = false;
     int contentLengthPosition = -1;
 
-    if (protocol == PLAIN || 1) {
+    if (protocol == PLAIN) {
         // Updating reference
         respFrom = from;
 
@@ -207,12 +207,13 @@ int ProxySocket::read(vector<char> &buffer, int from, int& respFrom) {
 
             // Get Content Length
             for (i=messageStart-1; i>=from; i--) {
-                if (!strcmp(&buffer[i], "Content-Length")) {
+                if (!strncmp(&buffer[i], "Content-Length", 14)) {
                     break;
                 }
             }
 
             if (i < from) {
+                logger(VERB2) << "Did not find Content-Length";
                 return -2;
             }
 
@@ -223,16 +224,24 @@ int ProxySocket::read(vector<char> &buffer, int from, int& respFrom) {
             }
 
             if (i == messageStart) {
+                logger(VERB2) << "Did not find colon";
                 return -2;
             }
 
             for (; i<messageStart; i++) {
-                if (buffer[i] !=' ') {
+                if (buffer[i] !=' ' &&
+                    buffer[i] >= '0' && buffer[i] <= '9') {
                     break;
                 }
             }
 
+            if (i == messageStart) {
+                logger(VERB2) << "Did not find numerical content length";
+                return -2;
+            }
+
             for (; i<messageStart; i++) {
+                printf("Got %c or %d\n", buffer[i], buffer[i]);
                 if (buffer[i] < '0' || buffer[i] > '9') {
                     break;
                 } else {
@@ -245,6 +254,8 @@ int ProxySocket::read(vector<char> &buffer, int from, int& respFrom) {
 
             // Read till all bytes have been read
             // or connection has been broken for long
+            bytesRead = 0;
+            failures = 0;
             while (failures < 50000 && bytesRead < messageLength) {
                 retval = recv(fd, &buffer[messageStart+bytesRead],
                               BUFSIZE-2-bytesRead-messageStart, 0);
@@ -255,7 +266,6 @@ int ProxySocket::read(vector<char> &buffer, int from, int& respFrom) {
                     connectionBroken = false;
                     failures = 0;
                     bytesRead += retval;
-                    messageLength += retval;
                 }
             }
 
