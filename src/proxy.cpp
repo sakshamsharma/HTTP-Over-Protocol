@@ -82,7 +82,7 @@ void exchangeData(ProxySocket& sock) {
     // Server process talks to the SSH server
     // But Client process talks to the evil proxy
     ProxySocket outsock = ProxySocket(remoteUrl, remotePort,
-                                      mode==CLIENT?PLAIN:PLAIN);
+                                      mode==CLIENT?HTTP:HTTP);
 
     // if (mode == CLIENT) {
     //     logger(VERB1) << "Sending hello handshake";

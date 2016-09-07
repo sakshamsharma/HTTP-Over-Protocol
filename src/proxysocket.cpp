@@ -60,24 +60,69 @@ ProxySocket::ProxySocket(char *host, int port, Protocol _outProto) {
 }
 
 int ProxySocket::write(vector<char> &buffer, int size, int& from) {
-    int bytesWritten = 0;
+    int bytesWritten;
+    int headerBytes;
     int i, retval, failures;
     bool connectionBroken = false;
+    char tmp[200];
 
     if (protocol == PLAIN) {
 
         failures = 0;
         bytesWritten = 0;
+        headerBytes = 0;
         while (bytesWritten < size && failures < 50000) {
-            retval = send(fd, &buffer[from+bytesWritten], size, 0);
+            retval = send(fd, &buffer[from+bytesWritten], size-bytesWritten, 0);
             if (retval == 0) {
                 connectionBroken = true;
                 failures += 10000;
             } else {
+                connectionBroken = false;
                 failures = 0;
                 bytesWritten += retval;
             }
         }
+
+    } else if (protocol == HTTP) {
+
+        failures = 0;
+        bytesWritten = 0;
+        headerBytes = snprintf(tmp, 196, "%s: %d\r\n\r\n", ss, size);
+
+        // Write HTTP header
+        while (bytesWritten < headerBytes && failures < 50000) {
+            retval = send(fd, &tmp[bytesWritten], headerBytes-bytesWritten, 0);
+            if (retval == 0) {
+                connectionBroken = true;
+                failures += 10000;
+            } else {
+                connectionBroken = false;
+                failures = 0;
+                bytesWritten += retval;
+            }
+        }
+
+        // Write the remaining bytes
+        if (!connectionBroken || bytesWritten == headerBytes) {
+            bytesWritten = 0;
+            while (bytesWritten < size && failures < 50000) {
+                retval = send(fd, &buffer[from+bytesWritten], size-bytesWritten, 0);
+                if (retval == 0) {
+                    connectionBroken = true;
+                    failures += 10000;
+                } else {
+                    connectionBroken = false;
+                    failures = 0;
+                    bytesWritten += retval;
+                }
+            }
+        }
+    }
+
+    if (connectionBroken) {
+        return -1;
+    } else {
+        return bytesWritten;
     }
 }
 
@@ -88,7 +133,7 @@ int ProxySocket::read(vector<char> &buffer, int from, int& respFrom) {
     int i, retval, failures;
     bool connectionBroken = false;
 
-    if (protocol == PLAIN) {
+    if (protocol == PLAIN || 1) {
         // Updating reference
         respFrom = 0;
 
@@ -101,10 +146,12 @@ int ProxySocket::read(vector<char> &buffer, int from, int& respFrom) {
                 connectionBroken = true;
                 failures += 10000;
             } else if (retval > 0) {
+                connectionBroken = false;
                 failures = 0;
                 bytesRead += retval;
                 messageLength += retval;
             } else if (retval == -1) {
+                connectionBroken = false;
                 failures++;
             }
         }
