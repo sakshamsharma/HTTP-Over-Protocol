@@ -8,7 +8,7 @@ enum LogLevel { DEBUG, VERB2, VERB1, INFO, WARN, ERROR};
 static const char *logStrings[] =
     { "DEBUG", "VERB2", "VERB1", "INFO ", "WARN ", "ERROR" };
 
-const LogLevel logLevel = DEBUG;
+const LogLevel logLevel = VERB2;
 
 class logIt {
     LogLevel level;

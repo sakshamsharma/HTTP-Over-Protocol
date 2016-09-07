@@ -4,7 +4,7 @@
 #include "proxysocket.h"
 #include "logger.h"
 
-#define SLEEPT 100000
+#define SLEEPT 1
 
 using namespace std;
 
@@ -13,8 +13,7 @@ char *remoteUrl;
 int remotePort;
 Mode mode = CLIENT;
 
-volatile bool remoteToListenerOn = false;
-volatile bool listenerToRemoteOn = false;
+mutex tlock;
 
 // For closing the sockets safely when Ctrl+C SIGINT is received
 void intHandler(int dummy) {
@@ -29,95 +28,51 @@ void pipeHandler(int dummy) {
     logger(INFO) << "Connection closed due to SIGPIPE";
 }
 
-struct connectionSockets {
-    ProxySocket& csock;
-    ProxySocket& outsock;
+struct tunnelContext {
+    ProxySocket& readSocket;
+    ProxySocket& writeSocket;
+    volatile bool& amIRunning;
+    volatile bool& sleepOn;
+    const char* type;
 };
 
-void *remoteToListener(void *context) {
-    vector<char> outBuffer((BUFSIZE+5)*sizeof(char));
-    int failuresOut = 0;
-    int a, b, c;
+void *packetTunnel(void *_context) {
+    struct tunnelContext *context = (struct tunnelContext*)_context;
+    ProxySocket& readSocket = context->readSocket;
+    ProxySocket& writeSocket = context->writeSocket;
+    const char* type = context->type;
+    volatile bool& otherHalfRunning = context->sleepOn;
 
-    struct connectionSockets *ptr = (struct connectionSockets*)context;
-    ProxySocket& csock = ptr->csock;
-    ProxySocket& outsock = ptr->outsock;
+    vector<char> buffer((BUFSIZE+5)*sizeof(char));
+    int failures = 0;
+    int messageSize, messageFrom;
+    bool otherPartySaysFine;
 
-    do {
-        // @a stores the number of bytes in the message
-        // @b is passed by reference
-        // It will store the position where the actual
-        // message starts.
-        // This is 0 if the message was in plaintext
-        // but will vary in case of HTTP
-        a = outsock.recvFromSocket(outBuffer, 0, b);
-        logger(VERB1) << "Got " << a << " bytes on outsocket";
-        if (a == -1) {
-            // Connection has been broken
-            failuresOut++;
-        } else if (a == 0) {
-            logger(DEBUG) << "Got nothing from remote";
-            failuresOut = 0;
+    while (failures < 5 && otherHalfRunning) {
+        tlock.lock();
+
+        // messageFrom passed by reference
+        messageSize = readSocket.read(buffer, 0, messageFrom);
+
+        if (messageSize == 0) {
+            // Empty message, confirm
+            logger(DEBUG, type) << "Read 0 bytes";
+        } else if (messageSize == -1) {
+            // Connection was closed
+            logger(VERB1, type) << "Reading socket was closed";
+            failures++;
         } else {
-            // TODO If sock is HTTP, don't send till you get a request
-            c = csock.sendFromSocket(outBuffer, b, a);
-            logger(VERB1) << "Wrote " << c << " bytes on insocket";
-            if (c == -1) {
-                failuresOut++;
-            } else {
-                failuresOut = 0;
-            }
-            logger(DEBUG) << "Sent " << c << "/" << a << " bytes from remote to local";
+            // Got some bytes
+            logger(VERB2, type) << "Received " << messageSize << " bytes";
+            writeSocket.write(buffer, messageSize, messageFrom);
         }
-        outBuffer[0] = 0;       // To allow sane logging
-        if (failuresOut != 0) {
-            logger(WARN, "RTL") << "Output failures: " << failuresOut;
-        }
+
+        tlock.unlock();
         usleep(SLEEPT);
-    } while (failuresOut < 10 && listenerToRemoteOn == true);
-    logger(WARN, "RTL") << "Exiting";
-    remoteToListenerOn = false;
-}
+    }
 
-void *listenerToRemote(void *context) {
-    vector<char> inpBuffer((BUFSIZE+5)*sizeof(char));
-    int failuresIn = 0;
-    int a, b, c;
-
-    struct connectionSockets *ptr = (struct connectionSockets*)context;
-    ProxySocket& csock = ptr->csock;
-    ProxySocket& outsock = ptr->outsock;
-
-    do {
-        // @a stores number of bytes in message
-        // @b is passed by reference
-        a = csock.recvFromSocket(inpBuffer, 0, b);
-        logger(VERB1) << "Got " << a << " bytes from insocket";
-        if (a == -1) {
-            // Connection has been broken
-            failuresIn++;
-        } else if (a == 0) {
-            logger(DEBUG) << "Got nothing from client";
-            failuresIn = 0;
-            // TODO Send empty HTTP requests if outsock is HTTP
-        } else {
-            c = outsock.sendFromSocket(inpBuffer, b, a);
-            logger(VERB1) << "Wrote " << c << " bytes into outsocket";
-            logger(DEBUG) << "Sent " << c << "/" << a << " bytes from local to remote";
-            if (c == -1) {
-                failuresIn++;
-            } else {
-                failuresIn = 0;
-            }
-        }
-        inpBuffer[0] = 0;       // For sane logging
-        if (failuresIn != 0) {
-            logger(WARN, "LTR") << "Input failures: " << failuresIn;
-        }
-        usleep(SLEEPT);
-    } while (failuresIn < 10 && remoteToListenerOn == true);
-    logger(WARN, "LTR") << "Exiting";
-    listenerToRemoteOn = false;
+    logger(WARN, type) << "Exiting";
+    context->amIRunning = false;
 }
 
 void exchangeData(ProxySocket& sock) {
@@ -127,23 +82,35 @@ void exchangeData(ProxySocket& sock) {
     // Server process talks to the SSH server
     // But Client process talks to the evil proxy
     ProxySocket outsock = ProxySocket(remoteUrl, remotePort,
-                                      mode==CLIENT?HTTP:PLAIN);
+                                      mode==CLIENT?PLAIN:PLAIN);
 
-    if (mode == CLIENT) {
-        logger(VERB1) << "Sending hello handshake";
-        outsock.sendHelloMessage();
-        logger(VERB1) << "Sent handshake";
-    } else {
-        logger(VERB1) << "Receiving hello handshake";
-        sock.receiveHelloMessage();
-        logger(VERB1) << "Received handshake";
-    }
+    // if (mode == CLIENT) {
+    //     logger(VERB1) << "Sending hello handshake";
+    //     outsock.sendHelloMessage();
+    //     logger(VERB1) << "Sent handshake";
+    // } else {
+    //     logger(VERB1) << "Receiving hello handshake";
+    //     sock.receiveHelloMessage();
+    //     logger(VERB1) << "Received handshake";
+    // }
 
-    remoteToListenerOn = true;
-    listenerToRemoteOn = true;
+    volatile bool ClientToOut = true;
+    volatile bool OutToClient = true;
 
-    struct connectionSockets context = {
-        sock, outsock
+    struct tunnelContext fromClientToOut = {
+        sock,
+        outsock,
+        OutToClient,
+        ClientToOut,
+        mode==CLIENT?"PlainToHTTP":"HTTPtoPlain"
+    };
+
+    struct tunnelContext fromOutToClient = {
+        outsock,
+        sock,
+        ClientToOut,
+        OutToClient,
+        mode==CLIENT?"HTTPtoPlain":"PlainToHTTP"
     };
 
     logger(VERB1) << "Ready to spawn read-write workers";
@@ -152,8 +119,8 @@ void exchangeData(ProxySocket& sock) {
     pthread_attr_t attr;
 
     pthread_attr_init(&attr);
-    pthread_create(&thread1, &attr, remoteToListener, &context);
-    pthread_create(&thread1, &attr, listenerToRemote, &context);
+    pthread_create(&thread1, &attr, packetTunnel, &fromClientToOut);
+    pthread_create(&thread1, &attr, packetTunnel, &fromOutToClient);
 
     pthread_join(thread1, NULL);
     pthread_join(thread2, NULL);

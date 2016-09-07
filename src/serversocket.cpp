@@ -36,7 +36,7 @@ void ServerSocket::connectToSocket(void (*connectionCallback)(ProxySocket&),
     int c = accept(mainSocketFd, (struct sockaddr *) &client, &clientLen);
     if (c < 0) return;
 
-    ProxySocket sock = ProxySocket(c, mode==CLIENT?PLAIN:HTTP);
+    ProxySocket sock = ProxySocket(c, mode==CLIENT?PLAIN:PLAIN);
 
     logger(INFO) << "Connected to client";
 

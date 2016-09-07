@@ -24,6 +24,7 @@
 #include <iostream>
 #include <sstream>
 #include <string>
+#include <mutex>
 
 #define BUFSIZE 65535
 #define MAXHOSTBUFFERSIZE 512

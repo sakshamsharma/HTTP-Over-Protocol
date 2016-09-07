@@ -25,6 +25,9 @@ public:
     ProxySocket(int, Protocol);
     ProxySocket(char *, int, Protocol);
 
+    int write(std::vector<char> &buffer, int size, int& from);
+    int read(std::vector<char> &buffer, int from, int& respFrom);
+
     int recvFromSocket(std::vector<char> &buffer, int, int &);
     int sendFromSocket(std::vector<char> &buffer, int len, int from);
 

@@ -9,8 +9,8 @@ ProxySocket::ProxySocket(int _fd, Protocol _inProto) {
     fd = _fd;
     lock = 0;
     protocol = _inProto;
-    logger(DEBUG) << "Accepted connection";
-    logger(DEBUG) << "This connection is in " << (protocol==PLAIN?"PLAIN":"HTTP");
+    logger(VERB1) << "Accepted connection";
+    logger(VERB1) << "This connection is in " << (protocol==PLAIN?"PLAIN":"HTTP");
     snprintf(ss, MAXHOSTBUFFERSIZE, "HTTP/1.1 200 OK\r\nContent-Length");
 
     setNonBlocking(fd);
@@ -19,8 +19,8 @@ ProxySocket::ProxySocket(int _fd, Protocol _inProto) {
 ProxySocket::ProxySocket(char *host, int port, Protocol _outProto) {
     protocol = _outProto;
     lock = 0;
-    logger(DEBUG) << "Making outgoing connection to " << host << ":" << port;
-    logger(DEBUG) << "This connection is in " << (protocol==PLAIN?"PLAIN":"HTTP");
+    logger(VERB1) << "Making outgoing connection to " << host << ":" << port;
+    logger(VERB1) << "This connection is in " << (protocol==PLAIN?"PLAIN":"HTTP");
     if (snprintf(ss, MAXHOSTBUFFERSIZE,
                  "GET %s / HTTP/1.0\r\nHost: %s:%d\r\nContent-Length",
                  host, host, port) >= MAXHOSTBUFFERSIZE) {
@@ -57,6 +57,64 @@ ProxySocket::ProxySocket(char *host, int port, Protocol _outProto) {
     }
 
     setNonBlocking(fd);
+}
+
+int ProxySocket::write(vector<char> &buffer, int size, int& from) {
+    int bytesWritten = 0;
+    int i, retval, failures;
+    bool connectionBroken = false;
+
+    if (protocol == PLAIN) {
+
+        failures = 0;
+        bytesWritten = 0;
+        while (bytesWritten < size && failures < 50000) {
+            retval = send(fd, &buffer[from+bytesWritten], size, 0);
+            if (retval == 0) {
+                connectionBroken = true;
+                failures += 10000;
+            } else {
+                failures = 0;
+                bytesWritten += retval;
+            }
+        }
+    }
+}
+
+int ProxySocket::read(vector<char> &buffer, int from, int& respFrom) {
+    int messageStart = -1;
+    int messageLength = 0;
+    int bytesRead = 0;
+    int i, retval, failures;
+    bool connectionBroken = false;
+
+    if (protocol == PLAIN) {
+        // Updating reference
+        respFrom = 0;
+
+        failures = 0;
+        bytesRead = 0;
+        while (failures < 50000 && bytesRead < 500) {
+            retval = recv(fd, &buffer[from+bytesRead],
+                        BUFSIZE-from-2-bytesRead, 0);
+            if (retval == 0) {
+                connectionBroken = true;
+                failures += 10000;
+            } else if (retval > 0) {
+                failures = 0;
+                bytesRead += retval;
+                messageLength += retval;
+            } else if (retval == -1) {
+                failures++;
+            }
+        }
+
+        if (connectionBroken) {
+            return -1;
+        } else {
+            return messageLength;
+        }
+    }
 }
 
 int ProxySocket::recvFromSocket(vector<char> &buffer, int from,
