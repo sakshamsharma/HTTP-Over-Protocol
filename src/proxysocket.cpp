@@ -260,7 +260,7 @@ int ProxySocket::read(vector<char> &buffer, int from, int& respFrom) {
             failures = 0;
             while (failures < 50000 && bytesRead < messageLength) {
                 retval = recv(fd, &buffer[messageStart+bytesRead],
-                              BUFSIZE-2-bytesRead-messageStart, 0);
+                              messageLength-bytesRead, 0);
                 if (retval == 0) {
                     connectionBroken = true;
                     failures += 10000;
