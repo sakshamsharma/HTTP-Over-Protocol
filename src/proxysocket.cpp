@@ -150,8 +150,11 @@ int ProxySocket::read(vector<char> &buffer, int from, int& respFrom) {
         // or connection has been broken for long
         while (failures < 50000 &&
                bytesRead < 500) {
+            // Don't accept too much data
+            // it has to be written via HTTP
+            // Leave space in buffer for headers
             retval = recv(fd, &buffer[from+bytesRead],
-                        BUFSIZE-from-2-bytesRead, 0);
+                        BUFSIZE-from-2-bytesRead-400, 0);
             if (retval == 0) {
                 connectionBroken = true;
                 failures += 10000;
@@ -202,7 +205,7 @@ int ProxySocket::read(vector<char> &buffer, int from, int& respFrom) {
         // Receive content if connection intact
         if (!connectionBroken && bytesRead > 0) {
             failures = 0;
-            bytesRead = 0;
+            bytesRead = bytesRead - (messageStart - from);
             messageLength = 0;
 
             // Get Content Length
@@ -241,7 +244,6 @@ int ProxySocket::read(vector<char> &buffer, int from, int& respFrom) {
             }
 
             for (; i<messageStart; i++) {
-                printf("Got %c or %d\n", buffer[i], buffer[i]);
                 if (buffer[i] < '0' || buffer[i] > '9') {
                     break;
                 } else {
@@ -254,7 +256,7 @@ int ProxySocket::read(vector<char> &buffer, int from, int& respFrom) {
 
             // Read till all bytes have been read
             // or connection has been broken for long
-            bytesRead = 0;
+            logger(VERB2) << "Already read " << bytesRead << " out of " << messageLength;
             failures = 0;
             while (failures < 50000 && bytesRead < messageLength) {
                 retval = recv(fd, &buffer[messageStart+bytesRead],
@@ -266,6 +268,7 @@ int ProxySocket::read(vector<char> &buffer, int from, int& respFrom) {
                     connectionBroken = false;
                     failures = 0;
                     bytesRead += retval;
+                    logger(VERB2) << "Have read " << bytesRead << " now";
                 }
             }
 
