@@ -167,6 +167,10 @@ int ProxySocket::recvFromSocket(vector<char> &buffer, int from,
         // Point @b to the start of the content length int
         k += 17;
         int tp=0;
+        for (int i = k; i<k+10; i++) {
+            printf("%d: %d\n", i, buffer[i]);
+        }
+        printf("Start of content is: %d\n", gotHttpHeaders);
         while (buffer[k] >= '0' && buffer[k] <= '9') {
             tp *= 10;
             tp += buffer[k]-'0';
@@ -182,8 +186,12 @@ int ProxySocket::recvFromSocket(vector<char> &buffer, int from,
 
         respFrom = startOfContent; // Update this reference int
 
+        logger(WARN) << "Looking for " << contentLength << "bytes";
+        logger(WARN) << "Reading from " << (int)buffer[startOfContent-1] << "," << (int)buffer[startOfContent];
+
         // How many bytes we've read of the content
         contentBytes = receivedBytes - startOfContent;
+        logger(WARN) << "ReceivedBytes: " << receivedBytes;
         bufferBytesRemaining = BUFSIZE-from-receivedBytes-2;
 
         while(contentBytes < contentLength && bufferBytesRemaining > 0) {
@@ -209,7 +217,7 @@ int ProxySocket::recvFromSocket(vector<char> &buffer, int from,
                 bufferBytesRemaining -= retval;
             }
         }
-
+        logger(DEBUG) << "Last byte: " << (int)buffer[from+startOfContent+contentBytes-1];
     }
 
     // Signal error, or return length of message
