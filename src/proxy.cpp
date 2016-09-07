@@ -61,10 +61,15 @@ void *packetTunnel(void *_context) {
             // Connection was closed
             logger(VERB1, type) << "Reading socket was closed";
             failures++;
+        } else if (messageSize == -2) {
+            // Does not follow protocol
+            logger(VERB1, type) << "Received bad message";
+            failures += 10;
         } else {
             // Got some bytes
             logger(VERB2, type) << "Received " << messageSize << " bytes";
-            writeSocket.write(buffer, messageSize, messageFrom);
+            logger(VERB2, type) << "Wrote " <<
+                writeSocket.write(buffer, messageSize, messageFrom) << " bytes";
         }
 
         tlock.unlock();
@@ -82,7 +87,7 @@ void exchangeData(ProxySocket& sock) {
     // Server process talks to the SSH server
     // But Client process talks to the evil proxy
     ProxySocket outsock = ProxySocket(remoteUrl, remotePort,
-                                      mode==CLIENT?HTTP:HTTP);
+                                      mode==CLIENT?HTTP:PLAIN);
 
     // if (mode == CLIENT) {
     //     logger(VERB1) << "Sending hello handshake";

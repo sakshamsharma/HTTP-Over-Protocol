@@ -101,9 +101,10 @@ int ProxySocket::write(vector<char> &buffer, int size, int& from) {
                 bytesWritten += retval;
             }
         }
+        logger(VERB2) << "Wrote " << headerBytes << " as HTTP headers";
 
         // Write the remaining bytes
-        if (!connectionBroken || bytesWritten == headerBytes) {
+        if (!connectionBroken || bytesWritten == 0) {
             bytesWritten = 0;
             while (bytesWritten < size && failures < 50000) {
                 retval = send(fd, &buffer[from+bytesWritten], size-bytesWritten, 0);
@@ -117,11 +118,14 @@ int ProxySocket::write(vector<char> &buffer, int size, int& from) {
                 }
             }
         }
+
+        logger(VERB2) << "Wrote " << bytesWritten << " to HTTP socket";
     }
 
     if (connectionBroken) {
         return -1;
     } else {
+        // This does not include the HTTP headers
         return bytesWritten;
     }
 }
@@ -132,14 +136,20 @@ int ProxySocket::read(vector<char> &buffer, int from, int& respFrom) {
     int bytesRead = 0;
     int i, retval, failures;
     bool connectionBroken = false;
+    int contentLengthPosition = -1;
 
     if (protocol == PLAIN || 1) {
         // Updating reference
-        respFrom = 0;
+        respFrom = from;
 
         failures = 0;
         bytesRead = 0;
-        while (failures < 50000 && bytesRead < 500) {
+
+        // Read till either no bytes read for long
+        // or if many bytes have been read
+        // or connection has been broken for long
+        while (failures < 50000 &&
+               bytesRead < 500) {
             retval = recv(fd, &buffer[from+bytesRead],
                         BUFSIZE-from-2-bytesRead, 0);
             if (retval == 0) {
@@ -156,11 +166,107 @@ int ProxySocket::read(vector<char> &buffer, int from, int& respFrom) {
             }
         }
 
-        if (connectionBroken) {
-            return -1;
-        } else {
-            return messageLength;
+    } else if (protocol == HTTP) {
+        failures = 0;
+        bytesRead = 0;
+
+        // Read till either no bytes read for long
+        // or if headers have been read
+        // or connection has been broken for long
+        while ((failures < 50000 || bytesRead > 0) &&
+               messageStart == -1 &&
+               (failures < 50000 || !connectionBroken)) {
+            retval = recv(fd, &buffer[from+bytesRead],
+                        BUFSIZE-from-2-bytesRead, 0);
+            if (retval == 0) {
+                connectionBroken = true;
+                failures += 10000;
+            } else if (retval > 0) {
+                connectionBroken = false;
+                failures = 0;
+
+                for (i=from+3; i<from+bytesRead+retval; i++) {
+                    if (buffer[i-3] == '\r' && buffer[i-2] == '\n' &&
+                        buffer[i-1] == '\r' && buffer[i-0] == '\n') {
+                        messageStart = from+i+1;
+                    }
+                }
+
+                bytesRead += retval;
+            } else if (retval == -1) {
+                connectionBroken = false;
+                failures++;
+            }
         }
+
+        // Receive content if connection intact
+        if (!connectionBroken && bytesRead > 0) {
+            failures = 0;
+            bytesRead = 0;
+            messageLength = 0;
+
+            // Get Content Length
+            for (i=messageStart-1; i>=from; i--) {
+                if (!strcmp(&buffer[i], "Content-Length")) {
+                    break;
+                }
+            }
+
+            if (i < from) {
+                return -2;
+            }
+
+            for (; i<messageStart; i++) {
+                if (buffer[i] == ':') {
+                    break;
+                }
+            }
+
+            if (i == messageStart) {
+                return -2;
+            }
+
+            for (; i<messageStart; i++) {
+                if (buffer[i] !=' ') {
+                    break;
+                }
+            }
+
+            for (; i<messageStart; i++) {
+                if (buffer[i] < '0' || buffer[i] > '9') {
+                    break;
+                } else {
+                    messageLength *= 10;
+                    messageLength += buffer[i] - '0';
+                }
+            }
+
+            logger(VERB2) << "Content-Length: " << messageLength;
+
+            // Read till all bytes have been read
+            // or connection has been broken for long
+            while (failures < 50000 && bytesRead < messageLength) {
+                retval = recv(fd, &buffer[messageStart+bytesRead],
+                              BUFSIZE-2-bytesRead-messageStart, 0);
+                if (retval == 0) {
+                    connectionBroken = true;
+                    failures += 10000;
+                } else if (retval > 0) {
+                    connectionBroken = false;
+                    failures = 0;
+                    bytesRead += retval;
+                    messageLength += retval;
+                }
+            }
+
+            respFrom = messageStart;
+        }
+    }
+
+    if (connectionBroken) {
+        return -1;
+    } else {
+        return messageLength;
     }
 }
 
