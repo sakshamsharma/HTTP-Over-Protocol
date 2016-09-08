@@ -38,47 +38,42 @@ struct tunnelContext {
     vector<char>& buffer;
 };
 
-void *packetTunnel(void *_context) {
-    struct tunnelContext *context = (struct tunnelContext*)_context;
+int packetTunnel(struct tunnelContext *context) {
     ProxySocket& readSocket = context->readSocket;
     ProxySocket& writeSocket = context->writeSocket;
     const char* type = context->type;
     volatile bool& otherHalfRunning = context->sleepOn;
     vector<char>& buffer = context->buffer;
 
-    int failures = 0;
     int messageSize, messageFrom;
-    bool otherPartySaysFine;
+    int failures = 0;
 
-    while (failures < 5 && otherHalfRunning) {
-        tlock.lock();
+    tlock.lock();
 
-        // messageFrom passed by reference
-        messageSize = readSocket.read(buffer, 0, messageFrom);
+    // messageFrom passed by reference
+    messageSize = readSocket.read(buffer, 0, messageFrom);
 
-        if (messageSize == 0) {
-            // Empty message, confirm
-            logger(DEBUG, type) << "Read 0 bytes";
-        } else if (messageSize == -1) {
-            // Connection was closed
-            logger(VERB1, type) << "Reading socket was closed";
-            failures++;
-        } else if (messageSize == -2) {
-            // Does not follow protocol
-            logger(VERB1, type) << "Received bad message";
-            failures += 10;
-        } else {
-            // Got some bytes
-            logger(VERB2, type) << "Received " << messageSize << " bytes";
-            writeSocket.write(buffer, messageSize, messageFrom);
-        }
-
-        tlock.unlock();
-        usleep(SLEEPT);
+    if (messageSize == 0) {
+        // Empty message, confirm
+        logger(DEBUG, type) << "Read 0 bytes";
+    } else if (messageSize == -1) {
+        // Connection was closed
+        logger(VERB1, type) << "Reading socket was closed";
+        failures++;
+    } else if (messageSize == -2) {
+        // Does not follow protocol
+        logger(VERB1, type) << "Received bad message";
+        failures += 10;
+    } else {
+        // Got some bytes
+        logger(VERB2, type) << "Received " << messageSize << " bytes";
+        writeSocket.write(buffer, messageSize, messageFrom);
     }
 
-    logger(WARN, type) << "Exiting";
-    context->amIRunning = false;
+    tlock.unlock();
+    usleep(SLEEPT);
+
+    return failures;
 }
 
 void exchangeData(ProxySocket& sock) {
@@ -126,10 +121,25 @@ void exchangeData(ProxySocket& sock) {
 
     logger(VERB1) << "Ready to spawn read-write workers";
 
-    thread th1(packetTunnel, (void*)(&fromClientToOut));
-    thread th2(packetTunnel, (void*)(&fromOutToClient));
-    th1.join();
-    th2.join();
+    int infail = 0;
+    int outfail = 0;
+    int k;
+
+    while (infail < 5 && outfail < 5) {
+        k = packetTunnel(&fromClientToOut);
+        if (k == 0) {
+            infail = 0;
+        } else {
+            infail += k;
+        }
+
+        k = packetTunnel(&fromOutToClient);
+        if (k == 0) {
+            outfail = 0;
+        } else {
+            outfail += k;
+        }
+    }
 
     usleep(100000);
     inbuffer.clear();
