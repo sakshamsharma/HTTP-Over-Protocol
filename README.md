@@ -81,10 +81,8 @@ I've put down a list of possible ideas if you would like to contribute.
 * Daemon mode for certain configs
 
 # Bugs
-* Currently uses a 100ms sleep after every send/receive cycle to bypass some memory error (not yet eliminated).
 * HTTP Responses may come before HTTP Requests. Let me know if you know of some proxy which blocks such responses.
-* Logger seems to be non-thread-safe, despite locking. Leads to memory errors, and thus disabled for now.
-* See issue #1. Some transfers have missing content.
+* Logger seems to be non-thread-safe, despite locking. Suspected for memory errors, and thus disabled for now.
 
 # Testing
 ```

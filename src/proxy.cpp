@@ -4,7 +4,7 @@
 #include "proxysocket.h"
 #include "logger.h"
 
-#define SLEEPT 100000
+#define SLEEPT 1000
 
 using namespace std;
 
