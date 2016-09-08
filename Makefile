@@ -1,5 +1,5 @@
 CC=g++ -std=c++11
-CFLAGS= -g -Wall -Werror
+CFLAGS= -g -Wall -Werror -O2
 
 INC=-I./include
 SRC=./src

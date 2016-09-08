@@ -13,7 +13,6 @@ public:
     struct hostent *server;
     char ss[MAXHOSTBUFFERSIZE+1];
     char headers[MAXHOSTBUFFERSIZE+5];
-    volatile int lock;
 
     Protocol protocol;
 

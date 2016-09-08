@@ -4,7 +4,7 @@
 #include "proxysocket.h"
 #include "logger.h"
 
-#define SLEEPT 100000
+#define SLEEPT 50000
 
 using namespace std;
 
@@ -26,6 +26,7 @@ void intHandler(int dummy) {
 // When client closes pipe
 void pipeHandler(int dummy) {
     logger(INFO) << "Connection closed due to SIGPIPE";
+    exit(0);
 }
 
 struct tunnelContext {
@@ -34,6 +35,7 @@ struct tunnelContext {
     volatile bool& amIRunning;
     volatile bool& sleepOn;
     const char* type;
+    vector<char>& buffer;
 };
 
 void *packetTunnel(void *_context) {
@@ -42,8 +44,8 @@ void *packetTunnel(void *_context) {
     ProxySocket& writeSocket = context->writeSocket;
     const char* type = context->type;
     volatile bool& otherHalfRunning = context->sleepOn;
+    vector<char>& buffer = context->buffer;
 
-    vector<char> buffer((BUFSIZE+5)*sizeof(char));
     int failures = 0;
     int messageSize, messageFrom;
     bool otherPartySaysFine;
@@ -82,6 +84,9 @@ void *packetTunnel(void *_context) {
 
 void exchangeData(ProxySocket& sock) {
 
+    vector<char> inbuffer((BUFSIZE+5)*sizeof(char));
+    vector<char> outbuffer((BUFSIZE+5)*sizeof(char));
+
     // This socket is HTTP for clients
     // but PLAIN for the server process
     // Server process talks to the SSH server
@@ -102,20 +107,22 @@ void exchangeData(ProxySocket& sock) {
     volatile bool ClientToOut = true;
     volatile bool OutToClient = true;
 
-    struct tunnelContext fromClientToOut = {
+    static struct tunnelContext fromClientToOut = {
         sock,
         outsock,
         OutToClient,
         ClientToOut,
-        mode==CLIENT?"PlainToHTTP":"HTTPtoPlain"
+        mode==CLIENT?"PlainToHTTP":"HTTPtoPlain",
+        inbuffer
     };
 
-    struct tunnelContext fromOutToClient = {
+    static struct tunnelContext fromOutToClient = {
         outsock,
         sock,
         ClientToOut,
         OutToClient,
-        mode==CLIENT?"HTTPtoPlain":"PlainToHTTP"
+        mode==CLIENT?"HTTPtoPlain":"PlainToHTTP",
+        outbuffer
     };
 
     logger(VERB1) << "Ready to spawn read-write workers";
@@ -131,6 +138,8 @@ void exchangeData(ProxySocket& sock) {
     pthread_join(thread2, NULL);
 
     usleep(5000000);
+
+    outsock.closeSocket();
 }
 
 int main(int argc, char * argv[]) {

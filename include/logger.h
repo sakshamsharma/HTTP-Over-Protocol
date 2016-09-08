@@ -3,6 +3,7 @@
 
 #include <iostream>
 #include <sstream>
+#include <mutex>
 
 enum LogLevel { DEBUG, VERB2, VERB1, INFO, WARN, ERROR};
 static const char *logStrings[] =
@@ -25,8 +26,9 @@ public:
     ~logIt();
 
 private:
-    std::ostringstream _buffer;
+    static std::ostringstream _buffer;
     bool toPrint;
+    static std::mutex llock;
 };
 
 #define GET_MACRO(_1,_2,NAME,...) NAME

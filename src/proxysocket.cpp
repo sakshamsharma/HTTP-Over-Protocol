@@ -7,7 +7,6 @@ using namespace std;
 
 ProxySocket::ProxySocket(int _fd, Protocol _inProto) {
     fd = _fd;
-    lock = 0;
     protocol = _inProto;
     logger(VERB1) << "Accepted connection";
     logger(VERB1) << "This connection is in " << (protocol==PLAIN?"PLAIN":"HTTP");
@@ -18,7 +17,6 @@ ProxySocket::ProxySocket(int _fd, Protocol _inProto) {
 
 ProxySocket::ProxySocket(char *host, int port, Protocol _outProto) {
     protocol = _outProto;
-    lock = 0;
     logger(VERB1) << "Making outgoing connection to " << host << ":" << port;
     logger(VERB1) << "This connection is in " << (protocol==PLAIN?"PLAIN":"HTTP");
     if (snprintf(ss, MAXHOSTBUFFERSIZE,
@@ -285,11 +283,6 @@ int ProxySocket::read(vector<char> &buffer, int from, int& respFrom) {
 
 int ProxySocket::recvFromSocket(vector<char> &buffer, int from,
                                 int &respFrom) {
-    while (lock != 1) {
-        while (lock != 0);
-        lock = 1;
-    }
-
     contentBytes = 0;
     receivedBytes = 0;
     numberOfFailures = 0;
@@ -323,7 +316,6 @@ int ProxySocket::recvFromSocket(vector<char> &buffer, int from,
 
         if (connectionBroken == true && receivedBytes == 0) {
             logger(VERB1) << "Exiting because of broken Plain connection";
-            lock = 0;
             return -1;
         } else if (connectionBroken == true) {
             logger(VERB1) << "PLAIN connection broken but will try again";
@@ -359,10 +351,8 @@ int ProxySocket::recvFromSocket(vector<char> &buffer, int from,
 
         if (connectionBroken == true && receivedBytes == 0) {
             logger(VERB1) << "Exiting because of broken HTTP connection";
-            lock = 0;
             return -1;
         } else if (receivedBytes == 0) {
-            lock = 0;
             return 0;
         } else if (connectionBroken == true) {
             logger(VERB1) << "HTTP connection broken but will try again";
@@ -384,7 +374,6 @@ int ProxySocket::recvFromSocket(vector<char> &buffer, int from,
         // If we couldn't find the header
         if (k == receivedBytes+from) {
             logger(DEBUG) << "Didn't find content-length in headers";
-            lock = 0;
             return 0;
         }
 
@@ -447,25 +436,17 @@ int ProxySocket::recvFromSocket(vector<char> &buffer, int from,
     // Signal error, or return length of message
     if (connectionBroken == true && contentBytes == 0) {
         logger(VERB1) << "Exiting because of broken HTTP connection when receiving content";
-        lock = 0;
         return -1;
     } else if (connectionBroken == true) {
         logger(VERB1) << "HTTP connection broken but will try again";
-        lock = 0;
         return 0;
     } else {
         logger(VERB2) << "Received " << contentBytes << " as HTTP, sending to other end";
-        lock = 0;
         return contentBytes;
     }
 }
 
 int ProxySocket::sendFromSocket(vector<char> &buffer, int from, int len) {
-
-    while (lock != 2) {
-        while (lock != 0);
-        lock = 2;
-    }
 
     sentBytes = 0;
     numberOfFailures = 0;
@@ -484,14 +465,12 @@ int ProxySocket::sendFromSocket(vector<char> &buffer, int from, int len) {
         logger(DEBUG) << "Wrote " << headers;
         sentBytes = send(fd, headers, writtenBytes, 0);
         if (sentBytes < 1) {
-            lock = 0;
             return -1;
         }
         sentBytes = send(fd, &buffer[from], len, 0);
         buffer[from+len] = 0;
         logger(DEBUG) << "Wrote now " << &buffer[from];
     }
-    lock = 0;
     return sentBytes;
 }
 
