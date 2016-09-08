@@ -49,8 +49,8 @@ ProxySocket::ProxySocket(char *host, int port, Protocol _outProto) {
 
     // Connect to the server's socket
     if (connect(fd, (struct sockaddr *)&servAddr, sizeof(servAddr)) < 0) {
-        logger(ERROR) << "Was connecting to " << host << ":" << port << "\n"
-                      << "Cannot connect to remote server";
+        logger(ERROR) << "Was connecting to " << host << ":" << port;
+        logger(ERROR) << "Cannot connect to remote server";
         exit(0);
     }
 

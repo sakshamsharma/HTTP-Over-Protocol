@@ -19,7 +19,7 @@ public:
 
     template <typename T>
     logIt & operator<<(T const & value) {
-        _buffer << value;
+        //_buffer << value;
         return *this;
     }
 
