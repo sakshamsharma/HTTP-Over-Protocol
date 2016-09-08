@@ -71,15 +71,31 @@ Pull Requests are more than welcome! :smile:
 
 I've put down a list of possible ideas if you would like to contribute.
 
-# Bugs
-* Currently uses a 100ms sleep after every send/receive cycle to allow for synchonizations.
-* HTTP Responses may come before HTTP Requests. Let me know if you know of some proxy which blocks such responses.
-* Some SSH connections break after a while, with a noticed extra connection being opened by SSH itself (on the client side). Suspected SSH attempting to create a replacement connection and killing the original connection. See issue #1
-
 # Planned features
 * Better and adaptive buffering
 * Better CLI flags interface
+* Optional encrypting of data
 * Parsing of .ssh/config file for hosts
 * Web interface for remote server admin
 * Web interface for local host
 * Daemon mode for certain configs
+
+# Bugs
+* Currently uses a 100ms sleep after every send/receive cycle to bypass some memory error (not yet eliminated).
+* HTTP Responses may come before HTTP Requests. Let me know if you know of some proxy which blocks such responses.
+* Logger seems to be non-thread-safe, despite locking. Leads to memory errors, and thus disabled for now.
+* See issue #1. Some transfers have missing content.
+
+# Testing
+```
+make
+./hop 8081 localhost 8091 SERVER
+./hop 8083 localhost 8081
+python -c 'print("\n".join([ str(i) for i in range(1000000, 2000000)]))' >! ff1
+python -c 'print("\n".join([ str(i) for i in range(2000000, 3000000)]))' >! ff2
+nc -l 8091 < ff1 >! oo1
+nc localhost 8083 < ff2 >! oo2
+wc -l oo*
+```
+
+This should say that both files contain a million lines. Any less would mean some data loss.
