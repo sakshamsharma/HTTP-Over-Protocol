@@ -4,7 +4,7 @@
 #include "proxysocket.h"
 #include "logger.h"
 
-#define SLEEPT 50000
+#define SLEEPT 100000
 
 using namespace std;
 
@@ -70,8 +70,7 @@ void *packetTunnel(void *_context) {
         } else {
             // Got some bytes
             logger(VERB2, type) << "Received " << messageSize << " bytes";
-            logger(VERB2, type) << "Wrote " <<
-                writeSocket.write(buffer, messageSize, messageFrom) << " bytes";
+            writeSocket.write(buffer, messageSize, messageFrom);
         }
 
         tlock.unlock();
@@ -94,15 +93,15 @@ void exchangeData(ProxySocket& sock) {
     ProxySocket outsock = ProxySocket(remoteUrl, remotePort,
                                       mode==CLIENT?HTTP:PLAIN);
 
-    // if (mode == CLIENT) {
-    //     logger(VERB1) << "Sending hello handshake";
-    //     outsock.sendHelloMessage();
-    //     logger(VERB1) << "Sent handshake";
-    // } else {
-    //     logger(VERB1) << "Receiving hello handshake";
-    //     sock.receiveHelloMessage();
-    //     logger(VERB1) << "Received handshake";
-    // }
+    if (mode == CLIENT) {
+        logger(VERB1) << "Sending hello handshake";
+        outsock.sendHelloMessage();
+        logger(VERB1) << "Sent handshake";
+    } else {
+        logger(VERB1) << "Receiving hello handshake";
+        sock.receiveHelloMessage();
+        logger(VERB1) << "Received handshake";
+    }
 
     volatile bool ClientToOut = true;
     volatile bool OutToClient = true;
@@ -127,19 +126,18 @@ void exchangeData(ProxySocket& sock) {
 
     logger(VERB1) << "Ready to spawn read-write workers";
 
-    pthread_t thread1, thread2;
-    pthread_attr_t attr;
+    thread th1(packetTunnel, (void*)(&fromClientToOut));
+    thread th2(packetTunnel, (void*)(&fromOutToClient));
+    th1.join();
+    th2.join();
 
-    pthread_attr_init(&attr);
-    pthread_create(&thread1, &attr, packetTunnel, &fromClientToOut);
-    pthread_create(&thread2, &attr, packetTunnel, &fromOutToClient);
-
-    pthread_join(thread1, NULL);
-    pthread_join(thread2, NULL);
-
-    usleep(5000000);
-
+    usleep(100000);
+    inbuffer.clear();
+    outbuffer.clear();
     outsock.closeSocket();
+    usleep(100000);
+    sock.closeSocket();
+    exit(0);
 }
 
 int main(int argc, char * argv[]) {
