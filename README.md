@@ -3,11 +3,13 @@ HTTP-Over-Protocol (HOP)
 
 ```
   _   _  ___  ____  
- | | | |/ _ \|  _ \ 
+ | | | |/ _ \|  _ \
  | |_| | | | | |_) |
- |  _  | |_| |  __/ 
- |_| |_|\___/|_|    
+ |  _  | |_| |  __/
+ |_| |_|\___/|_|
 ```
+
+**NOTE** Have a look at [go-hop](http://github.com/sakshamsharma/go-hop) for an under-development version in Golang.
 
 # Introduction
 A friend once told me that his university has an HTTP(S)-only proxy, and thus he is unable to SSH to hosts outside. 5 hours of intensive coding later using code borrowed from my course assignment, here's **HOP**.
